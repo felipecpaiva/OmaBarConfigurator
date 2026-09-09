@@ -89,7 +89,7 @@ All eight required fields are present and validated (`omarchy plugin validate` e
 | Field | Value |
 |---|---|
 | `schemaVersion` | `1` |
-| `id` | `felipe.bar-configurator` |
+| `id` | `io.github.felipecpaiva.omabarconfigurator` |
 | `name` | `Bar Configurator` |
 | `version` | `0.1.0` |
 | `author` | `felipecpaiva` |

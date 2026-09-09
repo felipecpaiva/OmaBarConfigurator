@@ -4,7 +4,7 @@
 set -euo pipefail
 
 REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PLUGIN_ID="felipe.bar-configurator"
+PLUGIN_ID="io.github.felipecpaiva.omabarconfigurator"
 PLUGIN_DEST="$HOME/.config/omarchy/plugins/$PLUGIN_ID"
 DESKTOP_SRC="$REPO_DIR/omabarconfigurator.desktop"
 DESKTOP_DEST="$HOME/.local/share/applications/omabarconfigurator.desktop"
@@ -41,5 +41,5 @@ fi
 install -Dm644 "$DESKTOP_SRC" "$DESKTOP_DEST"
 
 echo
-echo "Done. Super+Space -> Apps -> Bar Configurator."
+echo "Done. Super+Space -> Apps -> OmaBar Configurator."
 echo "Uninstall with: $REPO_DIR/uninstall.sh"

@@ -1,4 +1,4 @@
-# Bar Configurator
+# OmaBar Configurator
 
 Show, hide and reorder the widgets on your Omarchy bar from one panel.
 
@@ -7,7 +7,7 @@ pick a bar section and does not add a fifteenth icon to the bar. It lands in
 the **Applications** list instead, next to your other apps.
 
 ```
-Super+Space -> Apps -> Bar Configurator
+Super+Space -> Apps -> OmaBar Configurator
 ```
 
 ## Install
@@ -24,7 +24,7 @@ What install.sh touches, and nothing else:
 
 | Path | What lands there |
 |---|---|
-| `~/.config/omarchy/plugins/felipe.bar-configurator/` | the plugin itself |
+| `~/.config/omarchy/plugins/io.github.felipecpaiva.omabarconfigurator/` | the plugin itself |
 | `~/.config/omarchy/shell.json` | one `plugins[]` entry, via `omarchy plugin enable` |
 | `~/.local/share/applications/omabarconfigurator.desktop` | the Applications entry |
 
@@ -51,7 +51,7 @@ provider reads the shared `AppLibrary`, which is
 runs its `Exec`:
 
 ```
-omarchy-shell shell toggle felipe.bar-configurator
+omarchy-shell shell toggle io.github.felipecpaiva.omabarconfigurator
 ```
 
 which is the same IPC surface the shipped menu uses for its own panels
@@ -65,7 +65,7 @@ submenu, which survives `omarchy update`:
 
 ```jsonc
 // ~/.config/omarchy/extensions/omarchy-menu.jsonc
-"apps.bar-configurator": {"icon":"󰍜","label":"Bar Configurator","action":"omarchy-shell shell toggle felipe.bar-configurator"},
+"apps.bar-configurator": {"icon":"󰍜","label":"OmaBar Configurator","action":"omarchy-shell shell toggle io.github.felipecpaiva.omabarconfigurator"},
 ```
 
 Static children of `apps` survive every re-run of the apps provider, which
@@ -87,7 +87,7 @@ It reverses the install and nothing more:
 
 | Path | What happens |
 |---|---|
-| `~/.config/omarchy/plugins/felipe.bar-configurator/` | deleted |
+| `~/.config/omarchy/plugins/io.github.felipecpaiva.omabarconfigurator/` | deleted |
 | `~/.config/omarchy/shell.json` | the `plugins[]` entry removed, via `omarchy plugin disable` |
 | `~/.local/share/applications/omabarconfigurator.desktop` | deleted **only** if it carries `X-OmaBarConfigurator-Managed=true` |
 | `~/.config/omarchy/oma-bar-configurator.json` | left in place, so a reinstall still knows where your hidden widgets came from |

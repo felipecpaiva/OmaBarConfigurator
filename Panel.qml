@@ -38,7 +38,7 @@ Item {
   property var bar: null
 
   readonly property string pluginId: (manifest && manifest.id)
-    ? String(manifest.id) : "felipe.bar-configurator"
+    ? String(manifest.id) : "io.github.felipecpaiva.omabarconfigurator"
 
   // ---- bar state ------------------------------------------------------
   readonly property var barState: (shell && shell.bar) ? shell.bar : bar

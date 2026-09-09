@@ -2,7 +2,7 @@
 # Reverses install.sh. Safe to run even if install only partially completed.
 set -uo pipefail
 
-PLUGIN_ID="felipe.bar-configurator"
+PLUGIN_ID="io.github.felipecpaiva.omabarconfigurator"
 PLUGIN_DEST="$HOME/.config/omarchy/plugins/$PLUGIN_ID"
 DESKTOP_DEST="$HOME/.local/share/applications/omabarconfigurator.desktop"
 MARKER="X-OmaBarConfigurator-Managed=true"
