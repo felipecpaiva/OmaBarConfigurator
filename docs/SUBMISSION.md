@@ -89,3 +89,54 @@ All eight required fields are present and validated (`omarchy plugin validate` e
 
 One line from the publish page worth reading before submitting, verbatim: *"The marketplace
 validates listings, not plugin security. Plugins run unsandboxed."*
+
+
+---
+
+## Submission checklist — how each one is covered
+
+The form makes all five required. None is a formality; here is what backs each.
+
+**The repository is public and contains installation and removal instructions.**
+Public at `github.com/felipecpaiva/OmaBarConfigurator`. README has an `## Install`
+section and a separate `## Removal` section, each with the command and a table of
+every path touched.
+
+**I have documented the plugin license and any external dependencies.**
+`LICENSE` is MIT. README `## License and credits` states it and records that
+Omarchy's `qs.Ui` / `qs.Commons` components are **imported at runtime, not
+vendored** — no Omarchy source is copied into the repo. README
+`## Requirements and dependencies` lists the only external command, `jq`, which
+Omarchy's own plugin CLI already requires. No bundled libraries, no network
+access, no build step.
+
+**I confirm that I own or have permission to submit this plugin and its preview assets.**
+All code is original. The two screenshots in `docs/shots/` were taken on the
+author's own machine and cropped to the panel and the bar — no desktop, terminal
+or third-party content in frame.
+
+**The plugin does not overwrite user configuration without explicit consent.**
+The strongest of the five, and worth reading in full rather than ticking:
+
+- `install.sh` writes three paths, all listed in the README. An existing desktop
+  entry that this plugin did not write is moved to a timestamped `.bak` rather
+  than overwritten, and `uninstall.sh` only deletes one carrying
+  `X-OmaBarConfigurator-Managed=true`.
+- The plugin **never writes `shell.json` itself**. Every change shells out to
+  `omarchy plugin enable/disable` and `omarchy bar`, so the file is only ever
+  written by Omarchy's own tooling.
+- Changing the bar is the user's own click, one widget at a time. There is no
+  bulk action that runs unprompted, and no reset-to-defaults button — that was
+  considered for the header and rejected, because `omarchy bar defaults` wipes
+  the whole layout and should not sit one unconfirmed click away.
+- Hiding a widget stores its slot **and its inline settings** so restoring
+  returns them. Nothing is silently discarded.
+- The panel refuses to hide the widget named by `bar.centerAnchor`, because
+  nothing in Omarchy's `bin/` can rewrite that key and unpinning it slides the
+  whole centre section.
+
+**I understand that approval is for listing and is not a security review.**
+Understood. The publish page states it plainly: *"The marketplace validates
+listings, not plugin security. Plugins run unsandboxed."* This plugin runs
+unsandboxed like any other, shells out to Omarchy's CLI, and reads and writes
+only the three paths named above.

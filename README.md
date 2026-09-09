@@ -77,7 +77,44 @@ parse and silently drops **every** entry in it.
 `install.sh` deliberately does not write this line, because that file is
 yours to hand-edit. Remove it yourself if you uninstall.
 
-## Requirements
+## Removal
 
-Omarchy with the Quickshell desktop running (`omarchy-shell shell ping`
-answers `ok`). `jq` is already a dependency of the plugin CLI.
+```bash
+./uninstall.sh
+```
+
+It reverses the install and nothing more:
+
+| Path | What happens |
+|---|---|
+| `~/.config/omarchy/plugins/felipe.bar-configurator/` | deleted |
+| `~/.config/omarchy/shell.json` | the `plugins[]` entry removed, via `omarchy plugin disable` |
+| `~/.local/share/applications/omabarconfigurator.desktop` | deleted **only** if it carries `X-OmaBarConfigurator-Managed=true` |
+| `~/.config/omarchy/oma-bar-configurator.json` | left in place, so a reinstall still knows where your hidden widgets came from |
+
+Your `bar.layout` is not touched. Anything you hid stays hidden — turn it back
+on in the panel first if you want the bar restored before removing the plugin.
+A `.bak` the installer made from a desktop entry it did not write is left alone.
+
+## Requirements and dependencies
+
+- **Omarchy** with the Quickshell desktop running. Check with
+  `omarchy-shell shell ping`, which answers `ok`.
+- **`jq`** — used by `install.sh` to poll the plugin registry. Already a
+  dependency of Omarchy's own plugin CLI, so it is present on any Omarchy box.
+- Omarchy's own commands: `omarchy plugin enable/disable/validate`,
+  `omarchy bar`, `omarchy-shell`, `omarchy-plugin-list`.
+
+Nothing else. No bundled libraries, no network access, no build step, no
+runtime beyond what the shell already provides.
+
+## License and credits
+
+MIT, see [LICENSE](LICENSE).
+
+The panel is built from Omarchy's own `qs.Ui` and `qs.Commons` components —
+`Panel`, `PanelHero`, `PanelSectionHeader`, `ToggleSwitch`, `CursorSurface` and
+friends. They are **imported at runtime, not vendored**: no Omarchy source is
+copied into this repository. Omarchy is MIT-licensed by 37signals.
+
+The screenshots in `docs/shots/` are original, taken on the author's machine.
