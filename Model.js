@@ -178,6 +178,97 @@ function hideArgv(id) {
   return ["omarchy-plugin-disable", String(id || "")]
 }
 
+// A capture records the nearest VISIBLE neighbours, which is the only pair the
+// layout can show — a widget already hidden is not in it to be seen. That is
+// exact for one hide and wrong for a run of them: hide network, then audio,
+// then monitor, and all three record `omarchy.bluetooth` as prevId, because
+// each one inherited the survivor the one before it left behind.
+//
+// Restoring all three `--after omarchy.bluetooth` stacks them against the same
+// wall, so they come back in reverse. Measured on this machine, hiding
+// network/audio/monitor/bluetooth and restoring them top-down turned
+//   bluetooth network audio monitor
+// into
+//   bluetooth monitor audio network
+//
+// The recovery is the hide ORDER, which `savedHidden` already carries: two
+// records naming the same prevId cannot have had anything visible between
+// them, and the one hidden FIRST is the left one — at the later hide it was
+// already gone, which is exactly why the later one inherited its neighbour.
+// So X follows the last same-prev record hidden before it that is back on the
+// bar, and only failing that, prevId itself.
+//
+// The record has to be on the bar AND to the right of the shared neighbour to
+// count. A leftover from an arrangement the bar no longer has must not drag
+// the widget somewhere else; being to the right of prevId is the cheap check
+// that it still describes the same stretch of bar.
+//
+// prevIndex is -1 both when prevId is empty (X was first in its section) and
+// when prevId is itself still hidden. Either way it reads as "the start of the
+// section", which is the right floor: a sibling that is back on the bar is
+// still to X's left, and following it is still better than an index. That case
+// is not exotic -- it is what hiding a whole section and restoring it is made
+// of, where every record ends up with index 0 and no neighbours at all.
+// The walk repeats, because a chain of hides leaves a chain of records: hide
+// bluetooth, then audio, then network, and audio names network as its prevId
+// while network names agents. Stepping once from agents to network and
+// stopping would put monitor ahead of audio. Each step moves the anchor one
+// widget right and looks again, until nothing else claims the new anchor.
+function siblingAnchor(saved, entries, savedHidden) {
+  var list = Array.isArray(savedHidden) ? savedHidden : []
+  var key = String(saved.id || "")
+  var section = String(saved.section || "")
+  var anchor = String(saved.prevId || "")
+  var floor = indexOfId(entries, anchor)
+
+  for (var step = 0; step <= list.length; step++) {
+    var found = ""
+    for (var i = 0; i < list.length; i++) {
+      var record = list[i]
+      if (!isPlainObject(record)) continue
+      if (String(record.id || "") === key) break // past here they were hidden AFTER X
+      if (String(record.section || "") !== section) continue
+      if (String(record.prevId || "") !== anchor) continue
+      // Same prevId and hidden earlier means it sat between that neighbour and
+      // X; the LAST such record is the rightmost of them, so it is the one X
+      // has to follow. It must also still be on the bar and to the right of
+      // where we are, or it is a leftover from an arrangement this bar no
+      // longer has and following it would move the widget somewhere else.
+      if (indexOfId(entries, record.id) > floor) found = String(record.id)
+    }
+    if (!found) break
+    anchor = found
+    floor = indexOfId(entries, anchor)
+  }
+
+  return indexOfId(entries, anchor) === -1 ? "" : anchor
+}
+
+// The mirror of the same problem on the right-hand side, used when X's own
+// left neighbour is still hidden: follow nextId through the records that are
+// also still hidden until one of them is on the bar. `--before` that widget
+// puts X ahead of everything that was to its right, which is the correct slot
+// however many of its neighbours are gone.
+function chainedNextId(saved, entries, savedHidden) {
+  var list = Array.isArray(savedHidden) ? savedHidden : []
+  var id = String(saved.nextId || "")
+  var seen = {}
+  while (id && !seen[id]) {
+    if (indexOfId(entries, id) !== -1) return id
+    seen[id] = true
+    var next = ""
+    for (var i = 0; i < list.length; i++) {
+      var record = list[i]
+      if (isPlainObject(record) && String(record.id || "") === id) {
+        next = String(record.nextId || "")
+        break
+      }
+    }
+    id = next
+  }
+  return ""
+}
+
 // Restore placement: by NEIGHBOUR, falling back to index.
 //
 // A captured index is stale the moment anything else in the same section is
@@ -188,17 +279,19 @@ function hideArgv(id) {
 // lands the widget in the right place.
 //
 // The neighbour is checked against `shellConfig` here rather than left to the
-// host, because a placement the host cannot resolve is a hard CLI failure and
-// execDetached gives the caller no exit code to recover from. Fall back in
+// host, because a placement the host cannot resolve is a hard CLI failure —
+// `omarchy-plugin-enable: could not find target widget X`, exit 1 — and the
+// widget then stays off the bar. `shellConfig` must therefore be the live
+// on-disk layout, not a snapshot somebody handed us earlier. Fall back in
 // this order:
-//   1. --after prevId   (the widget that was to its left)
-//   2. --before nextId  (the widget that was to its right)
-//   3. --index          (clamped to the section length, as the host clamps it)
+//   1. --after  the sibling anchor, else prevId (the widget to its left)
+//   2. --before the chained nextId            (the widget to its right)
+//   3. --index                                (clamped, as the host clamps it)
 // Both neighbours gone means everything around it was hidden too, and the
 // index is then as good an answer as exists.
 //
 // Called with no shellConfig it emits the plain --section/--index form.
-function showArgv(saved, shellConfig) {
+function showArgv(saved, shellConfig, savedHidden) {
   if (!isPlainObject(saved) || !String(saved.id || "")) return null
   var section = REGIONS.indexOf(saved.section) !== -1 ? saved.section : "center"
   var argv = ["omarchy-plugin-enable", String(saved.id), "--section", section]
@@ -206,10 +299,13 @@ function showArgv(saved, shellConfig) {
     ? null : sectionEntries(shellConfig, section)
 
   if (entries) {
-    if (saved.prevId && indexOfId(entries, saved.prevId) !== -1)
-      return argv.concat(["--after", String(saved.prevId)])
-    if (saved.nextId && indexOfId(entries, saved.nextId) !== -1)
-      return argv.concat(["--before", String(saved.nextId)])
+    var after = siblingAnchor(saved, entries, savedHidden)
+    if (!after && saved.prevId && indexOfId(entries, saved.prevId) !== -1)
+      after = String(saved.prevId)
+    if (after) return argv.concat(["--after", after])
+
+    var before = chainedNextId(saved, entries, savedHidden)
+    if (before) return argv.concat(["--before", before])
   }
 
   var index = Math.floor(Number(saved.index))
@@ -232,6 +328,13 @@ function restoreSettingsArgv(saved) {
   var out = []
   for (var key in settings) {
     var value = settings[key]
+    // An empty array cannot be restored and does not need to be. `omarchy-bar
+    // set <id> <key> [] --json` fails with "Too few arguments provided (4
+    // required but 3 were provided)" because the shell IPC drops the empty
+    // argument, so emitting it only logs a WARN and loses the key anyway. An
+    // absent key and an empty array mean the same thing to every widget that
+    // reads one, so skipping it restores the same state, quietly.
+    if (Array.isArray(value) && value.length === 0) continue
     var argv = ["omarchy-bar", "set", id, String(key)]
     if (typeof value === "string") argv.push(value)
     else argv.push(JSON.stringify(value), "--json")
@@ -268,8 +371,8 @@ function hideSequence(id, clonedFrom) {
 // "could not find widget" if it lands before the enable. Quickshell's
 // execDetached is fire-and-forget, so the caller must drive these with a
 // Process and step on `exited`, not fire them all at once.
-function showSequence(saved, shellConfig) {
-  var placement = showArgv(saved, shellConfig)
+function showSequence(saved, shellConfig, savedHidden) {
+  var placement = showArgv(saved, shellConfig, savedHidden)
   if (!placement) return []
   return [placement].concat(restoreSettingsArgv(saved))
 }

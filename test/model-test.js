@@ -195,10 +195,19 @@ test("hide/show round-trip restores non-string inline settings (felipe.tray)", f
 
   disable(config, "felipe.tray") // the net effect of both commands
   run(config, M.showSequence(saved, config))
-  assert.deepStrictEqual(config.bar.layout.right, live().bar.layout.right)
   var restored = config.bar.layout.right[0]
+  assert.strictEqual(restored.id, "felipe.tray")
   assert.strictEqual(restored.alwaysShow, true, "must be boolean true, not the string \"true\"")
-  assert.deepStrictEqual(restored.pinned, [])
+  // `hidden: []` and `pinned: []` do NOT come back, on purpose. The shell IPC
+  // drops an empty argument, so `omarchy-bar set felipe.tray pinned [] --json`
+  // fails with "Too few arguments provided" and loses the key anyway. Emitting
+  // it only adds a WARN line. Absent and empty read the same to the widget, so
+  // the restored state is equivalent. This assertion used to expect the arrays
+  // back, and passed only because the fake never simulated the failing command
+  // -- the test encoded the bug. A real click on the tray is what exposed it.
+  assert.strictEqual("pinned" in restored, false, "an empty array is not restored")
+  assert.strictEqual("hidden" in restored, false, "an empty array is not restored")
+  assert.deepStrictEqual(Object.keys(restored).sort(), ["alwaysShow", "id"])
 })
 
 test("settings are pushed with --json for everything but strings", function() {
@@ -226,7 +235,9 @@ test("showSequence puts the enable before every bar set", function() {
   var saved = M.captureEntry(live(), "felipe.tray")
   var seq = M.showSequence(saved, live())
   assert.strictEqual(seq[0][0], "omarchy-plugin-enable")
-  assert.strictEqual(seq.length, 4)
+  // enable + one `bar set` for alwaysShow. `hidden: []` and `pinned: []` are
+  // skipped -- see the round-trip test above.
+  assert.strictEqual(seq.length, 2)
   assert.ok(seq.slice(1).every(function(a) { return a[0] === "omarchy-bar" }))
 })
 
@@ -437,6 +448,175 @@ test("every argv element is a string (execDetached will not marshal numbers)", f
       assert.strictEqual(typeof part, "string", JSON.stringify(argv) + " has a non-string part")
     })
   })
+})
+
+// ------------------------------------------------- multi-hide / multi-restore
+
+// The panel's own store semantics, so these drive the loop the user drives
+// rather than a store written by hand: hideWidget captures from the LIVE
+// config and replaces any record with the same id, showWidget KEEPS the record
+// (it is what carries the hide order), and every placement is resolved against
+// the config as it is by then.
+function panel(config) {
+  var store = []
+  return {
+    store: store,
+    hide: function(id) {
+      var captured = M.captureEntry(config, id)
+      assert.ok(captured, "hide: " + id + " is not on the bar")
+      for (var i = 0; i < store.length; i++)
+        if (store[i].id === id) { store.splice(i, 1); break }
+      store.push(captured)
+      run(config, M.hideSequence(id, ""))
+    },
+    show: function(id) {
+      var saved = null
+      for (var i = 0; i < store.length; i++) if (store[i].id === id) saved = store[i]
+      assert.ok(saved, "show: no record for " + id)
+      run(config, M.showSequence(saved, config, store))
+    }
+  }
+}
+
+function rightIds(config) { return config.bar.layout.right.map(M.entryId) }
+
+function permutations(list) {
+  if (list.length <= 1) return [list.slice()]
+  var out = []
+  for (var i = 0; i < list.length; i++) {
+    var rest = list.slice(0, i).concat(list.slice(i + 1))
+    permutations(rest).forEach(function(tail) { out.push([list[i]].concat(tail)) })
+  }
+  return out
+}
+
+// The assertion the old behaviour fails. Hiding B after A means B inherits A's
+// old neighbour, and the record must name a widget that is ON THE BAR at that
+// instant -- a capture taken from a config that still lists A would write
+// prevId: A, and the restore then emits `--after A`, which the host cannot
+// resolve.
+test("a recorded neighbour is on the bar at the moment of the hide", function() {
+  var config = live()
+  var p = panel(config)
+  p.hide("omarchy.network")
+  p.hide("omarchy.audio") // its left-hand neighbour WAS omarchy.network
+
+  var audio = p.store[1]
+  assert.strictEqual(audio.id, "omarchy.audio")
+  assert.strictEqual(audio.prevId, "omarchy.bluetooth",
+                     "prevId must be the surviving neighbour, not the one just hidden")
+  assert.strictEqual(audio.nextId, "omarchy.monitor")
+  p.store.forEach(function(record) {
+    if (record.prevId)
+      assert.ok(M.captureEntry(config, record.prevId) || record.prevId === "omarchy.network",
+                record.id + " recorded a prevId that was not on the bar: " + record.prevId)
+  })
+})
+
+test("hide A, hide its neighbour B, restore B then A: byte-identical layout", function() {
+  var before = rightIds(live())
+  var config = live()
+  var p = panel(config)
+  p.hide("omarchy.network")
+  p.hide("omarchy.audio")
+  p.show("omarchy.audio")
+  p.show("omarchy.network")
+  assert.deepStrictEqual(rightIds(config), before)
+})
+
+// Four hidden out of one run, restored in every possible order. The reversal
+// bug (all three inheriting the same prevId and stacking `--after` it) shows up
+// in 18 of these 24 and in none of the two-widget cases, which is why hiding a
+// single widget always looked fine.
+test("four hidden widgets restore to the original layout in all 24 orders", function() {
+  var hideOrder = ["omarchy.network", "omarchy.audio", "omarchy.monitor", "omarchy.bluetooth"]
+  var before = rightIds(live())
+  permutations(hideOrder).forEach(function(order) {
+    var config = live()
+    var p = panel(config)
+    hideOrder.forEach(p.hide)
+    assert.deepStrictEqual(rightIds(config),
+                           ["felipe.tray", "omarchy.agents", "omarchy.power",
+                            "jankeesvw.notification-center"])
+    order.forEach(p.show)
+    assert.deepStrictEqual(rightIds(config), before,
+                           "restore order " + order.join(",") + " landed wrong")
+  })
+})
+
+// Hiding in a different order records a different set of neighbours, so the
+// ordering rule has to hold for the hide side too.
+test("the restore is exact whatever order the four were hidden in", function() {
+  var widgets = ["omarchy.bluetooth", "omarchy.network", "omarchy.audio", "omarchy.monitor"]
+  var before = rightIds(live())
+  permutations(widgets).forEach(function(hideOrder) {
+    var config = live()
+    var p = panel(config)
+    hideOrder.forEach(p.hide)
+    hideOrder.slice().reverse().forEach(p.show)
+    assert.deepStrictEqual(rightIds(config), before,
+                           "hide order " + hideOrder.join(",") + " landed wrong")
+    var config2 = live()
+    var p2 = panel(config2)
+    hideOrder.forEach(p2.hide)
+    widgets.forEach(p2.show) // top-down, the order the panel lists them
+    assert.deepStrictEqual(rightIds(config2), before,
+                           "hide order " + hideOrder.join(",") + " + top-down restore landed wrong")
+  })
+})
+
+// The whole section hidden and brought back: every neighbour is gone, so this
+// is the case that falls through to --index.
+test("hiding an entire section and restoring it comes back in order", function() {
+  var before = rightIds(live())
+  var config = live()
+  var p = panel(config)
+  before.forEach(p.hide)
+  assert.deepStrictEqual(rightIds(config), [])
+  before.forEach(p.show)
+  assert.deepStrictEqual(rightIds(config), before)
+})
+
+test("showArgv never names a neighbour that is not in the section", function() {
+  var config = live()
+  var p = panel(config)
+  p.hide("omarchy.network")
+  p.hide("omarchy.audio")
+  p.hide("omarchy.bluetooth")
+  var ids = rightIds(config)
+  p.store.forEach(function(saved) {
+    var argv = M.showArgv(saved, config, p.store)
+    var at = argv.indexOf("--after")
+    var before = argv.indexOf("--before")
+    if (at !== -1) assert.ok(ids.indexOf(argv[at + 1]) !== -1, "--after " + argv[at + 1] + " is not on the bar")
+    if (before !== -1) assert.ok(ids.indexOf(argv[before + 1]) !== -1, "--before " + argv[before + 1] + " is not on the bar")
+  })
+})
+
+// An empty array setting must emit no `bar set` command. The shell IPC drops an
+// empty argument, so the command fails with "Too few arguments provided", logs
+// a WARN, and loses the key regardless. Absent and empty mean the same thing to
+// every widget that reads one. Found by a real click on felipe.tray, which
+// carries `hidden: []` and `pinned: []`, after five automated rounds missed it.
+//
+// This block used to sit BELOW process.exit(), where it could not run and could
+// not fail; it referenced two names that do not exist in this file and nothing
+// noticed.
+test("an empty-array setting emits no bar set command", function() {
+  var savedTray = {
+    id: "felipe.tray", section: "right", index: 0,
+    entry: { id: "felipe.tray", alwaysShow: true, hidden: [], pinned: [] }
+  }
+  var argvs = M.restoreSettingsArgv(savedTray)
+  assert.deepStrictEqual(argvs.map(function(a) { return a[3] }), ["alwaysShow"])
+  assert.ok(JSON.stringify(argvs).indexOf("[]") === -1, "no argv carries an empty-array literal")
+
+  var savedPinned = {
+    id: "felipe.tray", section: "right", index: 0,
+    entry: { id: "felipe.tray", pinned: ["a.desktop"] }
+  }
+  assert.deepStrictEqual(M.restoreSettingsArgv(savedPinned).map(function(a) { return a[3] }),
+                         ["pinned"], "a non-empty array is still restored")
 })
 
 // ------------------------------------------------------------------------ run

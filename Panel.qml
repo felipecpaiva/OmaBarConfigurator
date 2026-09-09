@@ -327,6 +327,7 @@ Item {
     refreshPluginInfo()
     root.cursorActive = false
     root.cursorIndex = 0
+    widgetList.keepContentY = 0
     root.opened = true
     setCenterHoverRevealSuppressed(true)
     // The surface is not mapped yet when open() runs, so a `focus: true`
@@ -389,6 +390,44 @@ Item {
     store.setText(JSON.stringify({ version: 1, hidden: root.savedHidden }, null, 2) + "\n")
   }
 
+  // ---- live config -----------------------------------------------------
+  // `shell.barConfig` is fine to RENDER from and not safe to DECIDE from. It
+  // is a copy the host pushes on its own schedule (shell.qml syncPluginApis,
+  // driven by pluginsChanged), which is not our schedule: a capture taken from
+  // a copy that still lists a widget records a neighbour that is not there any
+  // more, and a restore resolved against one emits `--after <gone>`, which is
+  // a hard CLI failure -- "could not find target widget", exit 1 -- that
+  // leaves the widget off the bar entirely.
+  //
+  // So every hide and every show re-reads shell.json off disk at the moment it
+  // runs. `blockAllReads` makes reload() + text() a synchronous round trip, so
+  // the value is the file as it is now and not as it was when a signal last
+  // fired. Measured: the CLI has flushed the file before its process exits, and
+  // runSequence steps on `exited`, so this read is never ahead of the previous
+  // command's write.
+  FileView {
+    id: liveConfigFile
+    path: Quickshell.env("HOME") + "/.config/omarchy/shell.json"
+    watchChanges: false
+    blockLoading: true
+    blockAllReads: true
+    printErrors: false
+  }
+
+  function liveConfig() {
+    try {
+      liveConfigFile.reload()
+      var parsed = JSON.parse(liveConfigFile.text() || "{}")
+      // Same round trip as shellConfig, for the same reason: anything that
+      // crossed a host `var` boundary fails Array.isArray. JSON.parse output
+      // never did, but the fallback below has, so keep one shape for both.
+      if (parsed && typeof parsed === "object" && parsed.bar) return parsed
+    } catch (e) {
+      console.warn("bar-picker: live shell.json unreadable, falling back:", e)
+    }
+    return root.shellConfig
+  }
+
   Component.onCompleted: {
     store.reload()
     refreshPluginInfo()
@@ -404,6 +443,7 @@ Item {
   // shell, which is what puts omarchy's bin on PATH.
   property var pending: []
   readonly property bool busy: runner.running || pending.length > 0
+    || restoreQueue.length > 0
 
   Process {
     id: runner
@@ -424,6 +464,11 @@ Item {
   function stepQueue() {
     if (runner.running) return
     if (root.pending.length === 0) {
+      // The previous command's write has landed by now, so the next restore in
+      // a "show all" run resolves its neighbours against the bar it will
+      // actually be inserted into.
+      if (root.restoreQueue.length > 0) { stepRestoreQueue(); return }
+      pruneRestoredStore()
       // Widget names and clone sources change with what is enabled.
       refreshPluginInfo()
       return
@@ -465,6 +510,9 @@ Item {
   function toggleAt(index) {
     var row = rowAt(index)
     if (!row || !root.storeLoaded || root.busy) return
+    // The list is about to be rebuilt out from under itself; remember where it
+    // was standing first. See widgetList.keepContentY.
+    widgetList.keepContentY = widgetList.contentY
     if (row.visible) hideWidget(row)
     else showWidget(row)
   }
@@ -474,7 +522,7 @@ Item {
     var captured = null
     var sequence = null
     try {
-      captured = Model.captureEntry(root.shellConfig, row.id)
+      captured = Model.captureEntry(root.liveConfig(), row.id)
       sequence = Model.hideSequence(row.id, root.clonedFrom(row.id))
     } catch (e) {
       console.warn("bar-picker: hide of", row.id, "failed:", e)
@@ -484,9 +532,12 @@ Item {
       console.warn("bar-picker: nothing to capture for", row.id, "- refusing to hide")
       return
     }
-    // Recorded before the commands run: the splice destroys the only copy of
-    // the entry, so a hide that runs first and records second loses the
-    // widget's settings for good.
+    // Recorded BEFORE the commands run, and deliberately so: the splice
+    // destroys the only copy of the entry, so a hide that runs first and
+    // records second loses the widget's settings the one time the command
+    // fails halfway. A record for a widget that is still on the bar costs
+    // nothing -- barCatalogue believes the layout, not the store, so the row
+    // just reads as shown -- while the reverse loses data.
     var next = []
     for (var i = 0; i < root.savedHidden.length; i++)
       if (String(root.savedHidden[i].id) !== row.id) next.push(root.savedHidden[i])
@@ -496,11 +547,27 @@ Item {
     runSequence(sequence)
   }
 
+  // The record is NOT dropped here. Two reasons, and they are the two bugs
+  // this used to cause:
+  //
+  //  - Dropping it before the command succeeded meant a failed `plugin enable`
+  //    left the widget off the bar AND its entry gone from the store, with
+  //    nothing left to retry from. The whole point of the store is to survive
+  //    exactly that.
+  //  - showArgv needs the hide ORDER of the widgets already back on the bar to
+  //    place the ones still hidden (see Model.siblingAnchor). Deleting a record
+  //    on restore throws that order away mid-run, which is what let a
+  //    four-widget restore come back reversed.
+  //
+  // The record for a widget that is on the bar is inert: barCatalogue reads the
+  // layout as the truth, so the row shows as shown, and hiding it again
+  // replaces the record. pruneRestoredStore() empties the store once the run is
+  // over.
   function showWidget(row) {
     var saved = savedRecord(row.id)
     var sequence = null
     try {
-      sequence = Model.showSequence(saved, root.shellConfig)
+      sequence = Model.showSequence(saved, root.liveConfig(), root.savedHidden)
     } catch (e) {
       console.warn("bar-picker: restore of", row.id, "failed:", e)
       return
@@ -510,20 +577,44 @@ Item {
       return
     }
     runSequence(sequence)
-    var next = []
-    for (var i = 0; i < root.savedHidden.length; i++)
-      if (String(root.savedHidden[i].id) !== row.id) next.push(root.savedHidden[i])
-    root.savedHidden = next
+  }
+
+  // Once every widget we hid is back, the records have nothing left to order
+  // and the store empties itself. Keeping them past the end of the run would
+  // let an arrangement from a week ago decide where today's restore lands.
+  function pruneRestoredStore() {
+    if (root.savedHidden.length === 0) return
+    var cfg = root.liveConfig()
+    for (var i = 0; i < root.savedHidden.length; i++) {
+      try {
+        if (!Model.captureEntry(cfg, root.savedHidden[i].id)) return // still hidden
+      } catch (e) {
+        return
+      }
+    }
+    root.savedHidden = []
     persistStore()
   }
 
-  // One pass over the hidden rows. Each show is appended to the same queue, so
-  // they still apply one at a time and in order.
+  // One at a time, each one resolved against the bar as it is by then. Queuing
+  // every argv up front was the same stale-read bug in miniature: all of them
+  // were built against the layout as it looked BEFORE the first one ran, so the
+  // second widget onwards was placed against a bar that no longer existed.
+  property var restoreQueue: []
+
   function restoreAll() {
     if (root.busy) return
-    var hidden = []
-    for (var i = 0; i < rows.length; i++) if (!rows[i].visible) hidden.push(rows[i])
-    for (var h = 0; h < hidden.length; h++) showWidget(hidden[h])
+    var ids = []
+    for (var i = 0; i < rows.length; i++) if (!rows[i].visible) ids.push(rows[i].id)
+    root.restoreQueue = ids
+    stepRestoreQueue()
+  }
+
+  function stepRestoreQueue() {
+    if (root.restoreQueue.length === 0) return
+    var id = String(root.restoreQueue[0])
+    root.restoreQueue = root.restoreQueue.slice(1)
+    showWidget({ id: id })
   }
 
   // ---- keyboard cursor -------------------------------------------------
@@ -792,8 +883,31 @@ Item {
           property real snappedHeight: 0
           height: snappedHeight > 0 ? snappedHeight : capHeight
 
-          onCapHeightChanged: Qt.callLater(resnap)
-          onCountChanged: Qt.callLater(resnap)
+          // `model` is a plain JS array, so every rebuild REPLACES it and a
+          // ListView puts a replaced model back at the top. One toggle rebuilds
+          // it twice -- once when our own store changes, again when the host's
+          // config catches up -- so hiding three widgets in a row used to throw
+          // the user back to the top of a fifteen-row list twice.
+          //
+          // toggleAt records the position before it dispatches; every rebuild
+          // after that puts it back. Assigned late (Qt.callLater) because the
+          // delegates and contentHeight are not settled inside the model change
+          // itself, and there is nothing to clamp against yet.
+          property real keepContentY: 0
+          onModelChanged: Qt.callLater(restoreContentY)
+          onMovementEnded: keepContentY = contentY
+
+          function restoreContentY() {
+            var wanted = Math.max(0, Math.min(keepContentY, Math.max(0, contentHeight - height)))
+            if (Math.abs(contentY - wanted) > 0.5) contentY = wanted
+          }
+
+          // Snapping changes `height`, which re-clamps contentY, so the wanted
+          // position is re-applied after it rather than before.
+          onCapHeightChanged: Qt.callLater(resnapAndKeepPosition)
+          onCountChanged: Qt.callLater(resnapAndKeepPosition)
+
+          function resnapAndKeepPosition() { resnap(); restoreContentY() }
 
           function resnap() {
             if (capHeight >= contentHeight) { snappedHeight = 0; return }
