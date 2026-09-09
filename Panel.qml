@@ -55,11 +55,18 @@ Item {
   readonly property color dim: Qt.darker(foreground, 1.5)
   readonly property color hoverFill: Style.hoverFillFor(foreground, Color.accent)
   readonly property color selectedFill: Style.selectedFillFor(foreground, Color.accent)
-  // The resting fill for a row container. It has to be faint enough that the
-  // card reads as ink on the popup ground: the selected fill is the raised
-  // surface, and spending it on every row at rest turns the list into a
-  // striped slab and leaves nothing left to lift one row with.
+  // The kit's faintest fill. It is the OFF track of a switch and nothing
+  // else. Spending it as a ground under every row bought 41.5% of the card at
+  // 1.05:1 against that ground -- below the threshold where anything is
+  // visible -- and it consumed the raised slot the anchor row needed.
   readonly property color restingFill: Style.normalFillFor(foreground, Color.accent)
+
+  // Bar-wide transparency, the one other boolean `omarchy bar` owns. Read from
+  // the same detached config the layout comes from.
+  readonly property bool barTransparent: {
+    var cfg = root.shellConfig
+    return !!(cfg && cfg.bar && cfg.bar.transparent === true)
+  }
 
   // ---- config ---------------------------------------------------------
   // `shell.barConfig` is a detached copy of the `bar` object, refreshed by the
@@ -455,6 +462,11 @@ Item {
     runSequence([["omarchy-bar", "position", String(value)]])
   }
 
+  function setBarTransparent(value) {
+    if (root.busy) return
+    runSequence([["omarchy-bar", "transparent", value ? "true" : "false"]])
+  }
+
   function toggleAt(index) {
     var row = rowAt(index)
     if (!row || !root.storeLoaded || root.busy) return
@@ -654,15 +666,35 @@ Item {
               }
             }
 
+            // The hero's trailing rail, which was empty: 28% of the card's
+            // width and 134px tall holding 133 lit pixels, while the reference
+            // puts its action glyphs and a master toggle there. These two are
+            // the bar-wide verbs this panel already owns. The restore is
+            // present always now rather than appearing only once something is
+            // hidden -- a control that is absent teaches nobody it exists --
+            // and the switch reports a real bar setting rather than decorating.
             trailingControl: Component {
-              PanelActionButton {
-                visible: root.hiddenCount > 0
-                enabled: !root.busy
-                iconText: "󰈈"
-                tooltipText: "Show every hidden widget"
-                foreground: root.foreground
-                fontFamily: root.fontFamily
-                onClicked: root.restoreAll()
+              Row {
+                spacing: Style.space(8)
+
+                PanelActionButton {
+                  anchors.verticalCenter: parent.verticalCenter
+                  enabled: root.hiddenCount > 0 && !root.busy
+                  iconText: "󰈈"
+                  tooltipText: root.hiddenCount > 0
+                    ? "Show every hidden widget" : "Nothing is hidden"
+                  foreground: root.foreground
+                  fontFamily: root.fontFamily
+                  onClicked: root.restoreAll()
+                }
+
+                ToggleSwitch {
+                  anchors.verticalCenter: parent.verticalCenter
+                  checked: root.barTransparent
+                  busy: root.busy
+                  foreground: root.foreground
+                  onToggled: root.setBarTransparent(!root.barTransparent)
+                }
               }
             }
           }
@@ -747,12 +779,37 @@ Item {
         ListView {
           id: widgetList
           width: parent.width
-          // Two caps. The screen one is the hard limit; the 420 keeps a bar
+          // Two caps. The screen one is the hard limit; the second keeps a bar
           // with a lot of widgets from growing a card the height of the
-          // display -- past that the list scrolls, which is what the partial
-          // row at the bottom edge is telling you.
-          height: Math.min(contentHeight, Style.space(420), Math.max(Style.space(120),
-            win.availableHeight - card.verticalInset - headBlock.implicitHeight - content.spacing))
+          // display -- past that the list scrolls. It was 420, which sliced
+          // this machine's own bar four rows early while the screen still had
+          // the room for them.
+          readonly property real capHeight: Math.min(contentHeight, Style.space(560),
+            Math.max(Style.space(120),
+              win.availableHeight - card.verticalInset - headBlock.implicitHeight - content.spacing))
+
+          // Whatever the caps land on, the viewport ends on a row boundary. A
+          // row cut through its own middle reads as a clipping bug, not as
+          // "there is more below" -- and the scrollbar is already saying the
+          // second part. Assigned, never bound: `capHeight` is a function of
+          // contentHeight and the screen, neither of which depends on the
+          // viewport, so nothing here can feed back into itself.
+          property real snappedHeight: 0
+          height: snappedHeight > 0 ? snappedHeight : capHeight
+
+          onCapHeightChanged: Qt.callLater(resnap)
+          onCountChanged: Qt.callLater(resnap)
+
+          function resnap() {
+            if (capHeight >= contentHeight) { snappedHeight = 0; return }
+            // The delegate straddling the cut. -1 means the cut already fell in
+            // the gap between two rows, which is the thing we are aiming for.
+            var i = indexAt(2, contentY + capHeight)
+            if (i < 0) { snappedHeight = 0; return }
+            var item = itemAtIndex(i)
+            var top = item ? item.y - contentY : 0
+            snappedHeight = top >= Style.space(120) ? top : 0
+          }
           spacing: Style.space(2)
           clip: true
           boundsBehavior: Flickable.StopAtBounds
@@ -823,43 +880,24 @@ Item {
     readonly property bool locked: root.isLocked(row)
 
     hasCursor: root.cursorActive && root.cursorIndex === rowIndex
+    // The raised fill is the anchor row's and nothing else on the list spends
+    // it -- the same slot the network panel keeps for the network it is
+    // connected to. Every other row sits on the popup ground. The band that
+    // used to run under all of them measured 1.05:1 against that ground: 41.5%
+    // of the card for a difference nothing can see, and it held the one fill
+    // the anchor needed, which is why the anchor then wanted a rule AND a tag
+    // before it could be found. CursorSurface already draws exactly this; the
+    // explicit `color` that used to sit here was overriding it.
+    current: widgetRow.locked
     foreground: root.foreground
     fill: root.hoverFill
     currentFill: root.selectedFill
     implicitHeight: rowBody.implicitHeight
 
-    // Every row draws a band across the full content column, so the 10px the
-    // row content sits in reads as padding inside a container rather than an
-    // unexplained indent against the header and section labels above it.
-    //
-    // At rest that band is the faintest fill in the kit -- just enough to draw
-    // the container, not enough to become the ground. The raised-surface fill
-    // is spent on exactly ONE row, the one under the cursor, so the card reads
-    // as ink on the popup ground with one thing lifted out of it. Filling
-    // every enabled row with it was the previous version's mistake: ten
-    // selection-coloured slabs, and no fill left to select anything with.
-    color: widgetRow.hasCursor ? root.selectedFill : root.restingFill
-
     // Never dim the anchor row. It is pinned, not broken, and the dimmed
     // version read as a widget that had failed rather than one deliberately
-    // held on. Its emphasis is the left rule below; only a command in flight
-    // dims anything.
+    // held on. Only a command in flight dims anything.
     opacity: root.busy ? 0.6 : 1.0
-
-    // The anchor row's marker. Up, not down: a rule on the leading edge is how
-    // a list marks the row it is pinned to, and it costs no fill, so the
-    // cursor keeps sole ownership of the raised surface.
-    Rectangle {
-      visible: widgetRow.locked
-      anchors.left: parent.left
-      anchors.top: parent.top
-      anchors.bottom: parent.bottom
-      anchors.topMargin: Style.space(5)
-      anchors.bottomMargin: Style.space(5)
-      width: Style.space(3)
-      radius: width / 2
-      color: root.foreground
-    }
 
     MouseArea {
       id: rowMouse
@@ -905,34 +943,67 @@ Item {
         color: widgetRow.shown ? root.foreground : root.dim
       }
 
-      ToggleSwitch {
+      // Inlined rather than the shared ToggleSwitch for one reason: that one
+      // paints its ON knob at full foreground, and thirteen of those stacked in
+      // a column put 45.8% of the card's brightest ink in the right rail with
+      // every one of them saying the same thing. Here the knob rides the
+      // sub-label tier for the state every row is in, and the brightest value
+      // is kept for the rows that differ. Track, knob and inset are the shared
+      // component's formulas unchanged, so the rail axis does not move, and the
+      // row still owns the click, so there is no mouse area on it.
+      Item {
         id: rowSwitch
         anchors.right: parent.right
         anchors.verticalCenter: parent.verticalCenter
-        checked: widgetRow.shown
-        // The row owns the click, so the switch is presentation only.
-        interactive: false
-        cursorRing: false
-        foreground: root.foreground
+
+        readonly property int trackHeight: Math.max(22, Math.round(Style.spacing.controlHeight * 0.55))
+        readonly property int knobSize: Math.max(6, Math.round(trackHeight * 0.72))
+        readonly property int knobInset: Math.max(1, Math.round((trackHeight - knobSize) / 2))
+        readonly property bool rounded: Style.cornerRadius > 0
+
+        implicitWidth: Math.round(trackHeight * 1.9)
+        implicitHeight: trackHeight
+
+        BorderSurface {
+          id: rowTrack
+          anchors.fill: parent
+          radius: rowSwitch.rounded ? height / 2 : 0
+          color: widgetRow.shown ? root.selectedFill : root.restingFill
+          borderSpec: Border.controlSpec(widgetRow.shown ? "selected" : "normal",
+                                         root.foreground, Color.accent)
+
+          Rectangle {
+            width: rowSwitch.knobSize
+            height: rowSwitch.knobSize
+            radius: rowSwitch.rounded ? height / 2 : 0
+            x: widgetRow.shown ? rowTrack.width - width - rowSwitch.knobInset
+                               : rowSwitch.knobInset
+            anchors.verticalCenter: parent.verticalCenter
+            color: widgetRow.shown ? root.dim : root.foreground
+
+            Behavior on x { NumberAnimation { duration: 120; easing.type: Easing.OutCubic } }
+            Behavior on color { ColorAnimation { duration: 120 } }
+          }
+        }
       }
 
       // Trailing state marker, the slot the network panel keeps for its row
-      // state glyphs. A word rather than a glyph: it is caption-height so the
-      // row keeps a constant pitch, and it needs no contact sheet to prove it
-      // draws what its name says.
+      // state. Sentence case, unbolded, untracked -- deliberately NOT the
+      // small-caps of the LEFT / CENTER / RIGHT headers, which is what the
+      // bolded and tracked "ANCHOR" was colliding with: a row-level fact drawn
+      // at group-level rank. The reference writes "Connected" in this slot,
+      // not "CONNECTED", for the same reason.
       Text {
         id: rowState
         textFormat: Text.PlainText
         visible: widgetRow.locked
-        text: "ANCHOR"
+        text: "Pinned"
         anchors.right: rowSwitch.left
         anchors.rightMargin: Style.space(10)
         anchors.verticalCenter: parent.verticalCenter
         color: root.dim
         font.family: root.fontFamily
         font.pixelSize: Style.font.caption
-        font.bold: true
-        font.letterSpacing: 1.2
       }
 
       // One line, always. A second line under the name is what made the anchor
