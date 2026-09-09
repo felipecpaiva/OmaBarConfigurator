@@ -1,6 +1,5 @@
 import QtQuick
 import QtQuick.Controls
-import QtQuick.Layouts
 import Quickshell
 import Quickshell.Io
 import Quickshell.Wayland
@@ -225,6 +224,65 @@ Item {
     return info ? info.clonedFrom : ""
   }
 
+  // ---- bar geometry -----------------------------------------------------
+  // A widget can be on the bar and paint nothing, and the two are impossible
+  // to tell apart from the layout alone. `bluetooth/Panel.qml:500` is
+  // `visible: adapter !== null`, so a soft-blocked radio leaves a perfectly
+  // intact bar entry drawing zero pixels -- which reads as a restore that
+  // failed, and cost a debugging cycle saying so. `felipe.tray` is width 0
+  // today for the same class of reason.
+  //
+  // This is NOT readable in-process. A third-party plugin's `shell.bar` is
+  // `services/PluginBarStateApi.qml` -- four scalars, no methods (assigned at
+  // `shell.qml:593`). `debugBarGeometry()` lives on the real Bar
+  // (`plugins/bar/Bar.qml:361`), which the facade deliberately never retains,
+  // and `shell.serviceFor` is scoped to this plugin's own ids. So it goes out
+  // over the same IPC the CLI uses, async, like every other command here.
+  property var notDrawingIds: ({})
+
+  Process {
+    id: geometryProc
+    command: ["bash", "-lc", 'exec "$@"', "bash", "omarchy-shell", "shell", "debugBarGeometry"]
+    stdout: StdioCollector {
+      waitForEnd: true
+      onStreamFinished: root.loadGeometry(text)
+    }
+  }
+
+  function loadGeometry(raw) {
+    var next = ({})
+    try {
+      var list = JSON.parse(String(raw || "") || "[]")
+      for (var i = 0; i < list.length; i++) {
+        var slot = list[i]
+        if (!slot || !slot.id) continue
+        // Only a slot that reported itself and reported no size is known to be
+        // blank. An id ABSENT from the list has no slot yet, which is not the
+        // same claim -- marking it would be the guess this must not make.
+        next[String(slot.id)] = slot.visible !== true
+      }
+    } catch (e) {
+      console.warn("bar-picker: bar geometry unreadable:", e)
+      return
+    }
+    root.notDrawingIds = next
+  }
+
+  function refreshGeometry() {
+    if (!geometryProc.running) geometryProc.running = true
+  }
+
+  // The bar re-lays out after the CLI has written, and the write is only
+  // guaranteed flushed at process exit -- so a read taken the instant the
+  // queue drains still describes the old bar. One late re-read settles it,
+  // which matters most here: a stale "Not drawing" on a widget that just came
+  // back is the exact confusion this marker exists to remove.
+  Timer {
+    id: geometrySettle
+    interval: 600
+    onTriggered: root.refreshGeometry()
+  }
+
   // ---- naming + glyphs -------------------------------------------------
   readonly property var glyphById: ({
     "omarchy.menu": "",
@@ -325,6 +383,7 @@ Item {
     try { JSON.parse(payloadJson || "{}") } catch (e) {}
     store.reload()
     refreshPluginInfo()
+    refreshGeometry()
     root.cursorActive = false
     root.cursorIndex = 0
     widgetList.keepContentY = 0
@@ -431,6 +490,7 @@ Item {
   Component.onCompleted: {
     store.reload()
     refreshPluginInfo()
+    refreshGeometry()
   }
 
   // ---- sequential command runner ---------------------------------------
@@ -469,8 +529,10 @@ Item {
       // actually be inserted into.
       if (root.restoreQueue.length > 0) { stepRestoreQueue(); return }
       pruneRestoredStore()
-      // Widget names and clone sources change with what is enabled.
+      // Widget names and clone sources change with what is enabled, and so
+      // does which slots are drawing.
       refreshPluginInfo()
+      geometrySettle.restart()
       return
     }
     var next = root.pending[0]
@@ -785,23 +847,32 @@ Item {
             }
           }
 
-          GridLayout {
+          // Four counts, one or two characters each, forever. They were in a
+          // two-column right-aligned grid, which is the reference's shape but
+          // not the reference's DATA: its values are 5-13 characters stacked
+          // four deep, so its right axis accumulates into a column rule. Ours
+          // put a single digit 175px from its label, four times, and with two
+          // rows there was no axis to read. Fixed where the mismatch is -- the
+          // values -- rather than by padding the grid with invented stats.
+          //
+          // One row of tight label+value pairs on four evenly spaced starts:
+          // the number sits against the word it belongs to, the four cell
+          // starts are the alignment, and the block gives a line of height
+          // back to the head.
+          Row {
+            id: statRow
             width: parent.width
-            columns: 4
-            columnSpacing: Style.space(20)
-            rowSpacing: Style.spacing.labelGap
+            spacing: Style.space(6)
 
-            InfoLabel { text: "Left" }
-            InfoValue { text: root.regionCount("left") }
-            InfoLabel { text: "Center" }
-            InfoValue { text: root.regionCount("center") }
+            readonly property real cellWidth: (width - spacing * 3) / 4
 
-            InfoLabel { text: "Right" }
-            InfoValue { text: root.regionCount("right") }
-            InfoLabel { text: "Hidden" }
-            InfoValue {
-              text: root.hiddenCount
-              color: root.hiddenCount > 0 ? root.foreground : root.dim
+            StatCell { label: "Left"; value: root.regionCount("left") }
+            StatCell { label: "Center"; value: root.regionCount("center") }
+            StatCell { label: "Right"; value: root.regionCount("right") }
+            StatCell {
+              label: "Hidden"
+              value: root.hiddenCount
+              valueColor: root.hiddenCount > 0 ? root.foreground : root.dim
             }
           }
 
@@ -987,6 +1058,9 @@ Item {
 
     readonly property bool shown: row.visible
     readonly property bool locked: root.isLocked(row)
+    // On the bar and painting nothing. Its own truth, separate from `shown`:
+    // the entry is there, the widget just has nothing to draw.
+    readonly property bool blank: row.visible && root.notDrawingIds[row.id] === true
 
     hasCursor: root.cursorActive && root.cursorIndex === rowIndex
     // The raised fill is the anchor row's and nothing else on the list spends
@@ -1086,11 +1160,17 @@ Item {
       // bolded and tracked "ANCHOR" was colliding with: a row-level fact drawn
       // at group-level rank. The reference writes "Connected" in this slot,
       // not "CONNECTED", for the same reason.
+      //
+      // "Not drawing" rides here too, at the same tier and in the same token:
+      // it is a row-level fact, and it is information, not an alarm. Both can
+      // be true at once, so both get said rather than one hiding the other.
       Text {
         id: rowState
         textFormat: Text.PlainText
-        visible: widgetRow.locked
-        text: "Pinned"
+        visible: text !== ""
+        text: widgetRow.locked
+          ? (widgetRow.blank ? "Pinned, not drawing" : "Pinned")
+          : (widgetRow.blank ? "Not drawing" : "")
         anchors.right: rowSwitch.left
         anchors.rightMargin: Style.space(10)
         anchors.verticalCenter: parent.verticalCenter
@@ -1119,6 +1199,21 @@ Item {
     }
   }
 
+  // One count and the word it counts, kept together. `parent` is the stat row,
+  // which owns the cell width -- an inline component cannot see an id declared
+  // inside the tree below root.
+  component StatCell: Row {
+    property string label: ""
+    property string value: ""
+    property color valueColor: root.foreground
+
+    width: parent ? parent.cellWidth : 0
+    spacing: Style.space(6)
+
+    InfoLabel { text: parent.label }
+    InfoValue { text: parent.value; color: parent.valueColor }
+  }
+
   component InfoLabel: Text {
     textFormat: Text.PlainText
     color: root.foreground
@@ -1129,11 +1224,8 @@ Item {
 
   component InfoValue: Text {
     textFormat: Text.PlainText
-    Layout.fillWidth: true
-    horizontalAlignment: Text.AlignRight
     color: root.foreground
     font.family: root.fontFamily
     font.pixelSize: Style.font.bodySmall
-    elide: Text.ElideRight
   }
 }
