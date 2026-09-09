@@ -55,11 +55,6 @@ Item {
   readonly property color dim: Qt.darker(foreground, 1.5)
   readonly property color hoverFill: Style.hoverFillFor(foreground, Color.accent)
   readonly property color selectedFill: Style.selectedFillFor(foreground, Color.accent)
-  // The kit's faintest fill. It is the OFF track of a switch and nothing
-  // else. Spending it as a ground under every row bought 41.5% of the card at
-  // 1.05:1 against that ground -- below the threshold where anything is
-  // visible -- and it consumed the raised slot the anchor row needed.
-  readonly property color restingFill: Style.normalFillFor(foreground, Color.accent)
 
   // Bar-wide transparency, the one other boolean `omarchy bar` owns. Read from
   // the same detached config the layout comes from.
@@ -927,7 +922,11 @@ Item {
       anchors.right: parent.right
       anchors.top: parent.top
       anchors.leftMargin: Style.space(10)
-      anchors.rightMargin: Style.space(10)
+      // Not the left margin's 10. The switch is the only thing anchored to this
+      // edge, and the kit's header switch sits 6 inside the same rail (its
+      // cursor-ring pad), so 6 here puts all fourteen switches on one axis
+      // instead of leaving the thirteen list ones 4px short of it.
+      anchors.rightMargin: Style.space(6)
       implicitHeight: Math.max(rowGlyph.height, rowLabel.implicitHeight, rowSwitch.implicitHeight)
         + Style.spacing.rowPaddingX
 
@@ -943,48 +942,28 @@ Item {
         color: widgetRow.shown ? root.foreground : root.dim
       }
 
-      // Inlined rather than the shared ToggleSwitch for one reason: that one
-      // paints its ON knob at full foreground, and thirteen of those stacked in
-      // a column put 45.8% of the card's brightest ink in the right rail with
-      // every one of them saying the same thing. Here the knob rides the
-      // sub-label tier for the state every row is in, and the brightest value
-      // is kept for the rows that differ. Track, knob and inset are the shared
-      // component's formulas unchanged, so the rail axis does not move, and the
-      // row still owns the click, so there is no mouse area on it.
-      Item {
+      // The kit's switch, unmodified, exactly as `Toggle` parks it at the end
+      // of a labeled row: `interactive: false` hands the click to the row's own
+      // MouseArea and drops the cursor ring, so the item is the track and
+      // nothing else and its right edge lands on the header switch's axis.
+      //
+      // This replaces an inlined copy that dimmed the ON knob to the sub-label
+      // tier, out of a fear that thirteen knobs at full foreground would shout.
+      // That inverted the semantics: the OFF knob came out brighter than the ON
+      // one, so the rail read as thirteen disabled controls with the single
+      // genuinely-off switch the loudest thing in it. The kit has it the right
+      // way round -- ON takes the title token, the same value the reference
+      // card spends on its one ON switch, and OFF drops a tier and picks up the
+      // 1px border this card already gives every inactive segmented button.
+      // Fourteen switches, one rule, and the state reads in the right
+      // direction.
+      ToggleSwitch {
         id: rowSwitch
         anchors.right: parent.right
         anchors.verticalCenter: parent.verticalCenter
-
-        readonly property int trackHeight: Math.max(22, Math.round(Style.spacing.controlHeight * 0.55))
-        readonly property int knobSize: Math.max(6, Math.round(trackHeight * 0.72))
-        readonly property int knobInset: Math.max(1, Math.round((trackHeight - knobSize) / 2))
-        readonly property bool rounded: Style.cornerRadius > 0
-
-        implicitWidth: Math.round(trackHeight * 1.9)
-        implicitHeight: trackHeight
-
-        BorderSurface {
-          id: rowTrack
-          anchors.fill: parent
-          radius: rowSwitch.rounded ? height / 2 : 0
-          color: widgetRow.shown ? root.selectedFill : root.restingFill
-          borderSpec: Border.controlSpec(widgetRow.shown ? "selected" : "normal",
-                                         root.foreground, Color.accent)
-
-          Rectangle {
-            width: rowSwitch.knobSize
-            height: rowSwitch.knobSize
-            radius: rowSwitch.rounded ? height / 2 : 0
-            x: widgetRow.shown ? rowTrack.width - width - rowSwitch.knobInset
-                               : rowSwitch.knobInset
-            anchors.verticalCenter: parent.verticalCenter
-            color: widgetRow.shown ? root.dim : root.foreground
-
-            Behavior on x { NumberAnimation { duration: 120; easing.type: Easing.OutCubic } }
-            Behavior on color { ColorAnimation { duration: 120 } }
-          }
-        }
+        checked: widgetRow.shown
+        interactive: false
+        foreground: root.foreground
       }
 
       // Trailing state marker, the slot the network panel keeps for its row
