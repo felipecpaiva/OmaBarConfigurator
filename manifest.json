@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 1,
+  "id": "felipe.bar-picker",
+  "name": "Bar Configurator",
+  "version": "0.1.0",
+  "author": "felipecpaiva",
+  "description": "Show, hide and reorder Omarchy bar widgets from one panel. Launches from the Applications list, and never takes a slot on the bar itself.",
+  "kinds": [
+    "panel"
+  ],
+  "entryPoints": {
+    "panel": "Panel.qml"
+  }
+}

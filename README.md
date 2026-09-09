@@ -1,0 +1,83 @@
+# Bar Configurator
+
+Show, hide and reorder the widgets on your Omarchy bar from one panel.
+
+It is a **panel** plugin, not a bar widget. Installing it does not ask you to
+pick a bar section and does not add a fifteenth icon to the bar. It lands in
+the **Applications** list instead, next to your other apps.
+
+```
+Super+Space -> Apps -> Bar Configurator
+```
+
+## Install
+
+```bash
+git clone https://github.com/felipecpaiva/omarchy-bar-picker.git
+cd omarchy-bar-picker
+./install.sh
+```
+
+No sudo. Re-running it is safe. Uninstall with `./uninstall.sh`.
+
+What install.sh touches, and nothing else:
+
+| Path | What lands there |
+|---|---|
+| `~/.config/omarchy/plugins/felipe.bar-picker/` | the plugin itself |
+| `~/.config/omarchy/shell.json` | one `plugins[]` entry, via `omarchy plugin enable` |
+| `~/.local/share/applications/omarchy-bar-picker.desktop` | the Applications entry |
+
+It never writes `bar.layout`, and it never edits your
+`~/.config/omarchy/extensions/omarchy-menu.jsonc`. An existing file at the
+desktop-entry path that this plugin did not write is moved to a timestamped
+`.bak` rather than overwritten, and `uninstall.sh` only ever deletes an entry
+carrying `X-OmarchyBarPicker-Managed=true`.
+
+## Why it is in Apps and not on the bar
+
+`omarchy plugin add` only offers the bar-section picker to plugins whose
+manifest declares `bar-widget`
+(`omarchy/bin/omarchy-plugin-add:45`). This one declares
+`"kinds": ["panel"]`, so enabling it appends to `plugins[]` in `shell.json`
+instead of splicing into `bar.layout`
+(`omarchy/shell/services/PluginRegistry.qml:542`).
+
+The Apps submenu of the Omarchy menu is fed by desktop entries. The `apps`
+provider reads the shared `AppLibrary`, which is
+`DesktopEntries.applications` (`omarchy/shell/plugins/menu/Menu.qml:290`,
+`omarchy/shell/services/AppLibrary.qml:53`). So a `.desktop` file in
+`~/.local/share/applications` is what puts it in that list. Selecting the row
+runs its `Exec`:
+
+```
+omarchy-shell shell toggle felipe.bar-picker
+```
+
+which is the same IPC surface the shipped menu uses for its own panels
+(`omarchy/default/omarchy/omarchy-menu.jsonc:100`).
+
+## Optional: a menu row as well
+
+App rows are searchable but not routable, so `omarchy menu summon` cannot
+reach one. If you want a keybindable route, add a static row under the same
+submenu, which survives `omarchy update`:
+
+```jsonc
+// ~/.config/omarchy/extensions/omarchy-menu.jsonc
+"apps.bar-picker": {"icon":"󰍜","label":"Bar Configurator","action":"omarchy-shell shell toggle felipe.bar-picker"},
+```
+
+Static children of `apps` survive every re-run of the apps provider, which
+only replaces rows of kind `app`
+(`omarchy/shell/plugins/menu/MenuModel.js:120`). Only whole-line `//`
+comments are allowed in that file. An inline trailing comment breaks the
+parse and silently drops **every** entry in it.
+
+`install.sh` deliberately does not write this line, because that file is
+yours to hand-edit. Remove it yourself if you uninstall.
+
+## Requirements
+
+Omarchy with the Quickshell desktop running (`omarchy-shell shell ping`
+answers `ok`). `jq` is already a dependency of the plugin CLI.
