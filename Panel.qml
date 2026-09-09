@@ -164,12 +164,6 @@ Item {
     return n
   }
 
-  readonly property string anchorName: {
-    for (var i = 0; i < rows.length; i++)
-      if (rows[i].isAnchor) return widgetName(rows[i].id)
-    return "None"
-  }
-
   // ---- plugin catalogue -------------------------------------------------
   // `omarchy plugin list --json` is the only place a clone's source id is
   // readable: the third-party registry facade is scoped to this plugin, and
@@ -617,10 +611,14 @@ Item {
 
           PanelHero {
             title: "Bar widgets"
+            // The bar position rides inline in the small-caps meta rather than
+            // in the hero's outlined pill: the pill was the only lowercase and
+            // the only outlined element in a card that is otherwise small-caps
+            // throughout. PanelHero upper-cases `meta` for us.
             meta: root.busy
               ? "APPLYING CHANGES"
-              : (root.shownCount + " shown, " + root.hiddenCount + " hidden")
-            detail: root.barPosition
+              : (root.barPosition + " bar \u00B7 " + root.shownCount
+                 + " shown, " + root.hiddenCount + " hidden")
             foreground: root.foreground
             fontFamily: root.fontFamily
 
@@ -664,12 +662,6 @@ Item {
             InfoValue {
               text: root.hiddenCount
               color: root.hiddenCount > 0 ? root.foreground : root.dim
-            }
-
-            InfoLabel { text: "Center anchor" }
-            InfoValue {
-              Layout.columnSpan: 3
-              text: root.anchorName
             }
           }
 
@@ -758,14 +750,27 @@ Item {
 
     readonly property bool shown: row.visible
     readonly property bool locked: root.isLocked(row)
-    readonly property string subLabel: locked ? "Center anchor" : (shown ? "" : "Hidden")
 
     hasCursor: root.cursorActive && root.cursorIndex === rowIndex
     foreground: root.foreground
     fill: root.hoverFill
     currentFill: root.selectedFill
     implicitHeight: rowBody.implicitHeight
-    opacity: root.busy ? 0.6 : 1.0
+
+    // Every row draws a band across the full content column, so the 10px the
+    // row content sits in reads as padding inside a container rather than an
+    // unexplained indent against the header and section labels above it. The
+    // band is filled while the widget is on the bar -- the way the network
+    // panel fills its connected row -- and brightens under the cursor.
+    readonly property color band: root.selectedFill
+    color: widgetRow.hasCursor
+      ? Qt.rgba(band.r, band.g, band.b, Math.min(1, band.a * 2))
+      : (widgetRow.shown ? band : "transparent")
+
+    // The anchor row is disabled, so the WHOLE row carries the disabled
+    // opacity. Dimming only the switch made one control in a column of
+    // otherwise identical controls look broken rather than turned off.
+    opacity: root.busy ? 0.6 : (locked ? 0.55 : 1.0)
 
     MouseArea {
       id: rowMouse
@@ -796,7 +801,7 @@ Item {
       anchors.top: parent.top
       anchors.leftMargin: Style.space(10)
       anchors.rightMargin: Style.space(10)
-      implicitHeight: Math.max(rowGlyph.height, rowLabels.implicitHeight, rowSwitch.implicitHeight)
+      implicitHeight: Math.max(rowGlyph.height, rowLabel.implicitHeight, rowSwitch.implicitHeight)
         + Style.spacing.rowPaddingX
 
       OpticalGlyph {
@@ -819,40 +824,44 @@ Item {
         // The row owns the click, so the switch is presentation only.
         interactive: false
         cursorRing: false
-        opacity: widgetRow.locked ? 0.45 : 1.0
         foreground: root.foreground
       }
 
-      Column {
-        id: rowLabels
-        spacing: Style.space(1)
-        anchors.left: rowGlyph.right
-        anchors.leftMargin: Style.space(10)
+      // Trailing state marker, the slot the network panel keeps for its row
+      // state glyphs. A word rather than a glyph: it is caption-height so the
+      // row keeps a constant pitch, and it needs no contact sheet to prove it
+      // draws what its name says.
+      Text {
+        id: rowState
+        textFormat: Text.PlainText
+        visible: widgetRow.locked
+        text: "ANCHOR"
         anchors.right: rowSwitch.left
         anchors.rightMargin: Style.space(10)
         anchors.verticalCenter: parent.verticalCenter
+        color: root.dim
+        font.family: root.fontFamily
+        font.pixelSize: Style.font.caption
+        font.bold: true
+        font.letterSpacing: 1.2
+      }
 
-        Text {
-          textFormat: Text.PlainText
-          width: parent.width
-          text: root.widgetName(widgetRow.row.id)
-          color: widgetRow.shown ? root.foreground : root.dim
-          font.family: root.fontFamily
-          font.pixelSize: Style.font.body
-          elide: Text.ElideRight
-        }
-
-        Text {
-          textFormat: Text.PlainText
-          visible: widgetRow.subLabel !== ""
-          height: visible ? implicitHeight : 0
-          width: parent.width
-          text: widgetRow.subLabel
-          color: root.dim
-          font.family: root.fontFamily
-          font.pixelSize: Style.font.caption
-          elide: Text.ElideRight
-        }
+      // One line, always. A second line under the name is what made the anchor
+      // row 4px taller than its neighbours and put a visible stumble in the
+      // list's pitch; the state it carried now rides beside the switch.
+      Text {
+        id: rowLabel
+        textFormat: Text.PlainText
+        anchors.left: rowGlyph.right
+        anchors.leftMargin: Style.space(10)
+        anchors.right: rowState.visible ? rowState.left : rowSwitch.left
+        anchors.rightMargin: Style.space(10)
+        anchors.verticalCenter: parent.verticalCenter
+        text: root.widgetName(widgetRow.row.id)
+        color: widgetRow.shown ? root.foreground : root.dim
+        font.family: root.fontFamily
+        font.pixelSize: Style.font.body
+        elide: Text.ElideRight
       }
     }
   }
