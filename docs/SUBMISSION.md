@@ -39,24 +39,34 @@ does not narrow anything for someone browsing.
 
 ## Maintainer notes
 
-> Panel-only plugin — `kinds: ["panel"]`, no bar widget. It installs a desktop entry and opens from
-> Super+Space → Apps, so it never takes a slot on the bar it configures.
+Paste this into the form's *Maintainer notes* field. It is short on purpose — the
+accepted listings run 4 to 10 lines, lead with what the plugin is, name what it
+writes, and finish with validation evidence. Implementation detail belongs in the
+README, not here.
+
+> A panel for showing and hiding the widgets on your bar, grouped by region.
+> Hiding one records its slot and its inline settings, so turning it back on
+> returns it to exactly where it was.
 >
-> It does not write `shell.json` itself. Every change shells out to `omarchy plugin enable/disable`
-> and `omarchy bar`, so the layout stays whatever Omarchy's own tooling produces.
+> `kinds: ["panel"]` with no bar widget, so it never takes a slot on the bar it
+> configures. It installs a desktop entry and opens from Super+Space → Apps.
 >
-> Two behaviours worth knowing before review:
+> **Writes:** three paths, all listed in the README — its own plugin directory,
+> its own hidden-widget store at `~/.config/omarchy/oma-bar-configurator.json`,
+> and one desktop entry carrying `X-OmaBarConfigurator-Managed=true`. An existing
+> entry at that path that it did not write is backed up, never overwritten.
 >
-> - Hiding a widget records its slot **and its inline settings**, because `plugin disable` splices
->   the whole entry and nothing else keeps a copy. Restoring replays both.
-> - Hiding a clone takes two commands. `restoreCloneSource` rewrites the clone's slot to the source
->   id in place rather than removing it, so disabling only the clone leaves the source sitting there.
+> It never writes `shell.json` itself. Every bar change shells out to
+> `omarchy plugin enable/disable` and `omarchy bar`, one widget per click. No
+> bulk action, and deliberately no reset-to-defaults button, since
+> `omarchy bar defaults` discards the whole layout.
 >
-> Known limits, stated up front: the panel refuses to hide the widget named by `bar.centerAnchor`,
-> because nothing in `bin/` can write that key and unpinning it silently slides the whole centre
-> section. Rows show "Not drawing" when a widget is on the bar but painting nothing — a
-> soft-blocked bluetooth radio leaves BlueZ with no adapter, and `visible: adapter !== null` means
-> the widget renders nothing whether or not it is in the layout.
+> No network, no elevated permissions, no bundled dependencies. `jq` is the only
+> external command and Omarchy's own plugin CLI already requires it.
+>
+> Validated at commit `36eb39d` with `omarchy plugin validate` (exit 0) and 36
+> unit tests. New listing, not a duplicate — this repository has not been
+> submitted before.
 
 ---
 
