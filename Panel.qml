@@ -55,6 +55,11 @@ Item {
   readonly property color dim: Qt.darker(foreground, 1.5)
   readonly property color hoverFill: Style.hoverFillFor(foreground, Color.accent)
   readonly property color selectedFill: Style.selectedFillFor(foreground, Color.accent)
+  // The resting fill for a row container. It has to be faint enough that the
+  // card reads as ink on the popup ground: the selected fill is the raised
+  // surface, and spending it on every row at rest turns the list into a
+  // striped slab and leaves nothing left to lift one row with.
+  readonly property color restingFill: Style.normalFillFor(foreground, Color.accent)
 
   // ---- config ---------------------------------------------------------
   // `shell.barConfig` is a detached copy of the `bar` object, refreshed by the
@@ -162,6 +167,16 @@ Item {
     for (var i = 0; i < rows.length; i++)
       if (rows[i].region === region && rows[i].visible) n++
     return n
+  }
+
+  // The widget the centre section is pinned to. The stat grid already counts
+  // what is where, so the eyebrow carries the one piece of bar state nothing
+  // else on the card shows -- and it is what the ANCHOR row further down is
+  // referring to.
+  readonly property string anchorName: {
+    for (var i = 0; i < rows.length; i++)
+      if (rows[i].visible && root.isLocked(rows[i])) return root.widgetName(rows[i].id)
+    return ""
   }
 
   // ---- plugin catalogue -------------------------------------------------
@@ -435,6 +450,11 @@ Item {
     }
   }
 
+  function setBarPosition(value) {
+    if (root.busy || value === root.barPosition) return
+    runSequence([["omarchy-bar", "position", String(value)]])
+  }
+
   function toggleAt(index) {
     var row = rowAt(index)
     if (!row || !root.storeLoaded || root.busy) return
@@ -611,14 +631,16 @@ Item {
 
           PanelHero {
             title: "Bar widgets"
-            // The bar position rides inline in the small-caps meta rather than
-            // in the hero's outlined pill: the pill was the only lowercase and
-            // the only outlined element in a card that is otherwise small-caps
-            // throughout. PanelHero upper-cases `meta` for us.
+            // The eyebrow must not restate the grid two rows below it: the
+            // section counts and the shown/hidden split are already there, and
+            // the bar position is on the button group. What is left, and what
+            // nothing else on the card says, is which widget the centre is
+            // pinned to. PanelHero upper-cases `meta` for us.
             meta: root.busy
               ? "APPLYING CHANGES"
-              : (root.barPosition + " bar \u00B7 " + root.shownCount
-                 + " shown, " + root.hiddenCount + " hidden")
+              : (root.anchorName !== ""
+                 ? "PINNED TO " + root.anchorName
+                 : "CENTRE UNPINNED")
             foreground: root.foreground
             fontFamily: root.fontFamily
 
@@ -662,6 +684,55 @@ Item {
             InfoValue {
               text: root.hiddenCount
               color: root.hiddenCount > 0 ? root.foreground : root.dim
+            }
+          }
+
+          PanelSeparator { foreground: root.foreground }
+
+          // The head's only control, on the axis the title row leaves empty.
+          // `omarchy bar position <top|bottom|left|right>` is a supported verb
+          // and it is the one bar-wide decision this card can honestly own --
+          // everything below it is per-widget.
+          Column {
+            width: parent.width
+            spacing: Style.space(4)
+
+            PanelSectionHeader {
+              text: "BAR POSITION"
+              // Same construction as the list's section headers so this one
+              // binds downward by the same amount: overshoot guard, plus the
+              // gap that separates it from what came before.
+              topPadding: Math.ceil(fontSize * 0.15) + Style.space(8)
+              foreground: root.foreground
+              fontFamily: root.fontFamily
+            }
+
+            Row {
+              id: positionRow
+              width: parent.width
+              spacing: Style.space(6)
+
+              readonly property real cellWidth: (width - spacing * 3) / 4
+
+              Repeater {
+                model: ["top", "right", "bottom", "left"]
+
+                delegate: Button {
+                  required property string modelData
+                  width: positionRow.cellWidth
+                  text: modelData.charAt(0).toUpperCase() + modelData.slice(1)
+                  tooltipText: "Move the bar to the " + modelData
+                  fontSize: Style.font.bodySmall
+                  fontFamily: root.fontFamily
+                  foreground: root.foreground
+                  horizontalPadding: Style.spacing.controlPaddingX
+                  verticalPadding: Style.spacing.controlPaddingY + Style.space(2)
+                  bordered: true
+                  active: root.barPosition === modelData
+                  enabled: !root.busy
+                  onClicked: root.setBarPosition(modelData)
+                }
+              }
             }
           }
 
@@ -759,18 +830,36 @@ Item {
 
     // Every row draws a band across the full content column, so the 10px the
     // row content sits in reads as padding inside a container rather than an
-    // unexplained indent against the header and section labels above it. The
-    // band is filled while the widget is on the bar -- the way the network
-    // panel fills its connected row -- and brightens under the cursor.
-    readonly property color band: root.selectedFill
-    color: widgetRow.hasCursor
-      ? Qt.rgba(band.r, band.g, band.b, Math.min(1, band.a * 2))
-      : (widgetRow.shown ? band : "transparent")
+    // unexplained indent against the header and section labels above it.
+    //
+    // At rest that band is the faintest fill in the kit -- just enough to draw
+    // the container, not enough to become the ground. The raised-surface fill
+    // is spent on exactly ONE row, the one under the cursor, so the card reads
+    // as ink on the popup ground with one thing lifted out of it. Filling
+    // every enabled row with it was the previous version's mistake: ten
+    // selection-coloured slabs, and no fill left to select anything with.
+    color: widgetRow.hasCursor ? root.selectedFill : root.restingFill
 
-    // The anchor row is disabled, so the WHOLE row carries the disabled
-    // opacity. Dimming only the switch made one control in a column of
-    // otherwise identical controls look broken rather than turned off.
-    opacity: root.busy ? 0.6 : (locked ? 0.55 : 1.0)
+    // Never dim the anchor row. It is pinned, not broken, and the dimmed
+    // version read as a widget that had failed rather than one deliberately
+    // held on. Its emphasis is the left rule below; only a command in flight
+    // dims anything.
+    opacity: root.busy ? 0.6 : 1.0
+
+    // The anchor row's marker. Up, not down: a rule on the leading edge is how
+    // a list marks the row it is pinned to, and it costs no fill, so the
+    // cursor keeps sole ownership of the raised surface.
+    Rectangle {
+      visible: widgetRow.locked
+      anchors.left: parent.left
+      anchors.top: parent.top
+      anchors.bottom: parent.bottom
+      anchors.topMargin: Style.space(5)
+      anchors.bottomMargin: Style.space(5)
+      width: Style.space(3)
+      radius: width / 2
+      color: root.foreground
+    }
 
     MouseArea {
       id: rowMouse
@@ -806,8 +895,8 @@ Item {
 
       OpticalGlyph {
         id: rowGlyph
-        width: Style.space(22)
-        height: Style.space(22)
+        width: Style.space(18)
+        height: Style.space(18)
         anchors.left: parent.left
         anchors.verticalCenter: parent.verticalCenter
         text: root.widgetGlyph(widgetRow.row.id)
