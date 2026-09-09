@@ -38,7 +38,7 @@ Item {
   property var bar: null
 
   readonly property string pluginId: (manifest && manifest.id)
-    ? String(manifest.id) : "felipe.bar-picker"
+    ? String(manifest.id) : "felipe.bar-configurator"
 
   // ---- bar state ------------------------------------------------------
   readonly property var barState: (shell && shell.bar) ? shell.bar : bar
@@ -77,7 +77,7 @@ Item {
     try {
       copy = JSON.parse(JSON.stringify(raw))
     } catch (e) {
-      console.warn("bar-picker: bar config unreadable:", e)
+      console.warn("oma-bar-configurator: bar config unreadable:", e)
     }
     return (copy && copy.bar !== undefined) ? copy : ({ bar: copy })
   }
@@ -111,7 +111,7 @@ Item {
       var list = Model.barCatalogue(cfg, saved)
       return Array.isArray(list) ? list : []
     } catch (e) {
-      console.warn("bar-picker: barCatalogue failed:", e)
+      console.warn("oma-bar-configurator: barCatalogue failed:", e)
       return []
     }
   }
@@ -209,7 +209,7 @@ Item {
         }
       }
     } catch (e) {
-      console.warn("bar-picker: plugin list unreadable:", e)
+      console.warn("oma-bar-configurator: plugin list unreadable:", e)
       return
     }
     root.pluginInfo = next
@@ -262,7 +262,7 @@ Item {
         next[String(slot.id)] = slot.visible !== true
       }
     } catch (e) {
-      console.warn("bar-picker: bar geometry unreadable:", e)
+      console.warn("oma-bar-configurator: bar geometry unreadable:", e)
       return
     }
     root.notDrawingIds = next
@@ -419,7 +419,7 @@ Item {
   // Its own file, never shell.json: every bar mutation goes out as argv so the
   // CLI stays the only writer of the shell config.
   readonly property string storePath:
-    Quickshell.env("HOME") + "/.config/omarchy/bar-picker.json"
+    Quickshell.env("HOME") + "/.config/omarchy/oma-bar-configurator.json"
 
   FileView {
     id: store
@@ -439,7 +439,7 @@ Item {
       var parsed = JSON.parse(String(raw || "") || "{}")
       if (parsed && Array.isArray(parsed.hidden)) next = parsed.hidden
     } catch (e) {
-      console.warn("bar-picker: hidden store unreadable, starting empty:", e)
+      console.warn("oma-bar-configurator: hidden store unreadable, starting empty:", e)
     }
     root.savedHidden = next
     root.storeLoaded = true
@@ -482,7 +482,7 @@ Item {
       // never did, but the fallback below has, so keep one shape for both.
       if (parsed && typeof parsed === "object" && parsed.bar) return parsed
     } catch (e) {
-      console.warn("bar-picker: live shell.json unreadable, falling back:", e)
+      console.warn("oma-bar-configurator: live shell.json unreadable, falling back:", e)
     }
     return root.shellConfig
   }
@@ -509,7 +509,7 @@ Item {
     id: runner
     onExited: function(exitCode) {
       if (exitCode !== 0)
-        console.warn("bar-picker: command failed (" + exitCode + "):",
+        console.warn("oma-bar-configurator: command failed (" + exitCode + "):",
                      JSON.stringify(runner.command))
       root.stepQueue()
     }
@@ -554,7 +554,7 @@ Item {
     try {
       return Model.isCenterAnchor(root.shellConfig, row.id)
     } catch (e) {
-      console.warn("bar-picker: isCenterAnchor failed:", e)
+      console.warn("oma-bar-configurator: isCenterAnchor failed:", e)
       return row.isAnchor === true
     }
   }
@@ -587,11 +587,11 @@ Item {
       captured = Model.captureEntry(root.liveConfig(), row.id)
       sequence = Model.hideSequence(row.id, root.clonedFrom(row.id))
     } catch (e) {
-      console.warn("bar-picker: hide of", row.id, "failed:", e)
+      console.warn("oma-bar-configurator: hide of", row.id, "failed:", e)
       return
     }
     if (!captured || !sequence || sequence.length === 0) {
-      console.warn("bar-picker: nothing to capture for", row.id, "- refusing to hide")
+      console.warn("oma-bar-configurator: nothing to capture for", row.id, "- refusing to hide")
       return
     }
     // Recorded BEFORE the commands run, and deliberately so: the splice
@@ -631,11 +631,11 @@ Item {
     try {
       sequence = Model.showSequence(saved, root.liveConfig(), root.savedHidden)
     } catch (e) {
-      console.warn("bar-picker: restore of", row.id, "failed:", e)
+      console.warn("oma-bar-configurator: restore of", row.id, "failed:", e)
       return
     }
     if (!sequence || sequence.length === 0) {
-      console.warn("bar-picker: no restore commands for", row.id)
+      console.warn("oma-bar-configurator: no restore commands for", row.id)
       return
     }
     runSequence(sequence)
@@ -700,7 +700,7 @@ Item {
     color: "transparent"
     exclusionMode: ExclusionMode.Ignore
 
-    WlrLayershell.namespace: "omarchy-bar-picker"
+    WlrLayershell.namespace: "omabarconfigurator"
     WlrLayershell.layer: WlrLayer.Overlay
     // Focus follows the logical state, not `visible`: the surface stays mapped
     // through the fade so there is something to animate, but keyboard and

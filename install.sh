@@ -4,11 +4,11 @@
 set -euo pipefail
 
 REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PLUGIN_ID="felipe.bar-picker"
+PLUGIN_ID="felipe.bar-configurator"
 PLUGIN_DEST="$HOME/.config/omarchy/plugins/$PLUGIN_ID"
-DESKTOP_SRC="$REPO_DIR/omarchy-bar-picker.desktop"
-DESKTOP_DEST="$HOME/.local/share/applications/omarchy-bar-picker.desktop"
-MARKER="X-OmarchyBarPicker-Managed=true"
+DESKTOP_SRC="$REPO_DIR/omabarconfigurator.desktop"
+DESKTOP_DEST="$HOME/.local/share/applications/omabarconfigurator.desktop"
+MARKER="X-OmaBarConfigurator-Managed=true"
 
 echo "== 1/3: installing the plugin =="
 shopt -s nullglob

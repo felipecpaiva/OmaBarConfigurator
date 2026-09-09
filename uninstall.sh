@@ -2,10 +2,10 @@
 # Reverses install.sh. Safe to run even if install only partially completed.
 set -uo pipefail
 
-PLUGIN_ID="felipe.bar-picker"
+PLUGIN_ID="felipe.bar-configurator"
 PLUGIN_DEST="$HOME/.config/omarchy/plugins/$PLUGIN_ID"
-DESKTOP_DEST="$HOME/.local/share/applications/omarchy-bar-picker.desktop"
-MARKER="X-OmarchyBarPicker-Managed=true"
+DESKTOP_DEST="$HOME/.local/share/applications/omabarconfigurator.desktop"
+MARKER="X-OmaBarConfigurator-Managed=true"
 
 echo "== 1/3: removing it from the Applications list =="
 # Only ever delete the file we wrote, identified by its marker key.

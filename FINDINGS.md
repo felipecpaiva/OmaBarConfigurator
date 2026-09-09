@@ -61,7 +61,7 @@ No click injection exists here (`ydotool`, `dotool`, `wlrctl`, `xdotool` absent;
 root-only). Available instead:
 
 ```
-qs -p /home/felipe/omarchy/shell/shell.qml ipc call <plugin-id> open    # close verb is `hide`
+qs -p "$OMARCHY_PATH"/shell/shell.qml ipc call <plugin-id> open    # close verb is `hide`
 hyprctl dispatch 'hl.dsp.cursor.move({x=N, y=N})'                       # named args in a Lua table
 grim -g "X,Y WxH" out.png                                               # logical in, physical out
 omarchy-restart-shell                                                   # hot reload is unreliable

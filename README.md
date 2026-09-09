@@ -13,8 +13,8 @@ Super+Space -> Apps -> Bar Configurator
 ## Install
 
 ```bash
-git clone https://github.com/felipecpaiva/omarchy-bar-picker.git
-cd omarchy-bar-picker
+git clone https://github.com/felipecpaiva/OmaBarConfigurator.git
+cd OmaBarConfigurator
 ./install.sh
 ```
 
@@ -24,15 +24,15 @@ What install.sh touches, and nothing else:
 
 | Path | What lands there |
 |---|---|
-| `~/.config/omarchy/plugins/felipe.bar-picker/` | the plugin itself |
+| `~/.config/omarchy/plugins/felipe.bar-configurator/` | the plugin itself |
 | `~/.config/omarchy/shell.json` | one `plugins[]` entry, via `omarchy plugin enable` |
-| `~/.local/share/applications/omarchy-bar-picker.desktop` | the Applications entry |
+| `~/.local/share/applications/omabarconfigurator.desktop` | the Applications entry |
 
 It never writes `bar.layout`, and it never edits your
 `~/.config/omarchy/extensions/omarchy-menu.jsonc`. An existing file at the
 desktop-entry path that this plugin did not write is moved to a timestamped
 `.bak` rather than overwritten, and `uninstall.sh` only ever deletes an entry
-carrying `X-OmarchyBarPicker-Managed=true`.
+carrying `X-OmaBarConfigurator-Managed=true`.
 
 ## Why it is in Apps and not on the bar
 
@@ -51,7 +51,7 @@ provider reads the shared `AppLibrary`, which is
 runs its `Exec`:
 
 ```
-omarchy-shell shell toggle felipe.bar-picker
+omarchy-shell shell toggle felipe.bar-configurator
 ```
 
 which is the same IPC surface the shipped menu uses for its own panels
@@ -65,7 +65,7 @@ submenu, which survives `omarchy update`:
 
 ```jsonc
 // ~/.config/omarchy/extensions/omarchy-menu.jsonc
-"apps.bar-picker": {"icon":"󰍜","label":"Bar Configurator","action":"omarchy-shell shell toggle felipe.bar-picker"},
+"apps.bar-configurator": {"icon":"󰍜","label":"Bar Configurator","action":"omarchy-shell shell toggle felipe.bar-configurator"},
 ```
 
 Static children of `apps` survive every re-run of the apps provider, which
