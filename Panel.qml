@@ -4,6 +4,7 @@ import Quickshell
 import Quickshell.Io
 import Quickshell.Wayland
 import qs.Commons
+import qs.Commons as Commons
 import qs.Ui
 import "Model.js" as Model
 
@@ -50,10 +51,10 @@ Item {
   readonly property string fontFamily: (barState && barState.fontFamily)
     ? String(barState.fontFamily) : Style.font.family
 
-  readonly property color foreground: Color.popups.text
+  readonly property color foreground: Commons.Color.popups.text
   readonly property color dim: Qt.darker(foreground, 1.5)
-  readonly property color hoverFill: Style.hoverFillFor(foreground, Color.accent)
-  readonly property color selectedFill: Style.selectedFillFor(foreground, Color.accent)
+  readonly property color hoverFill: Style.hoverFillFor(foreground, Commons.Color.accent)
+  readonly property color selectedFill: Style.selectedFillFor(foreground, Commons.Color.accent)
 
   // Bar-wide transparency, the one other boolean `omarchy bar` owns. Read from
   // the same detached config the layout comes from.
@@ -745,8 +746,8 @@ Item {
         return Math.round(win.height / 2 - height / 2)
       }
 
-      color: Color.popups.background
-      borderSpec: Border.surfaceSpec("popups", "border", Color.popups.border, Math.max(1, Style.space(2)))
+      color: Commons.Color.popups.background
+      borderSpec: Border.surfaceSpec("popups", "border", Commons.Color.popups.border, Math.max(1, Style.space(2)))
       padding: Style.spacing.popupPadding
       radius: Style.cornerRadius
       opacity: root.opened ? 1.0 : 0
