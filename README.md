@@ -10,6 +10,21 @@ the **Applications** list instead, next to your other apps.
 Super+Space -> Apps -> OmaBar Configurator
 ```
 
+## Moving widgets
+
+Hover a row (or put the keyboard cursor on it) and four arrows appear beside
+its switch:
+
+| Control | Key | What it does |
+|---|---|---|
+| ↑ / ↓ | Shift+K / Shift+J | Move one slot; past either end of a section it continues into the next |
+| ← / → | h / l | Jump to the near edge of the previous / next section |
+
+Moves go through `omarchy bar move`, which carries the whole entry, so inline
+settings (a clock's `format`, a tray's pins) come along. The widget the centre
+section is pinned to can reorder within the centre but cannot leave it, for
+the same reason it cannot be hidden.
+
 ## Install
 
 ```bash

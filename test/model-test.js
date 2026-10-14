@@ -619,6 +619,54 @@ test("an empty-array setting emits no bar set command", function() {
                          ["pinned"], "a non-empty array is still restored")
 })
 
+// ---------------------------------------------------------------------- moving
+
+function moveTail(argv) { return argv.slice(3) }
+
+test("stepArgv moves one slot within a section, naming the exact source slot", function() {
+  assert.deepStrictEqual(M.stepArgv(live(), "omarchy.weather", -1),
+    ["omarchy-bar", "move", "omarchy.weather",
+     "--from-section", "center", "--from-index", "2", "--section", "center", "--index", "1"])
+  assert.deepStrictEqual(moveTail(M.stepArgv(live(), "omarchy.weather", 1)),
+    ["--from-section", "center", "--from-index", "2", "--section", "center", "--index", "3"])
+})
+
+test("stepArgv crosses into the neighbouring section at either end", function() {
+  // first of center -> end of left
+  assert.deepStrictEqual(moveTail(M.stepArgv(live(), "omarchy.indicators", -1)).slice(4),
+    ["--section", "left", "--index", "2"])
+  // last of center -> start of right
+  assert.deepStrictEqual(moveTail(M.stepArgv(live(), "omarchy.system-update", 1)).slice(4),
+    ["--section", "right", "--index", "0"])
+})
+
+test("stepArgv stops at the two ends of the bar", function() {
+  assert.strictEqual(M.stepArgv(live(), "omarchy.menu", -1), null)
+  assert.strictEqual(M.stepArgv(live(), "jankeesvw.notification-center", 1), null)
+})
+
+test("sectionArgv jumps to the near edge of the neighbouring section", function() {
+  assert.deepStrictEqual(moveTail(M.sectionArgv(live(), "omarchy.agents", -1)).slice(4),
+    ["--section", "center", "--index", "5"])
+  assert.deepStrictEqual(moveTail(M.sectionArgv(live(), "omarchy.workspaces", 1)).slice(4),
+    ["--section", "center", "--index", "0"])
+  assert.strictEqual(M.sectionArgv(live(), "omarchy.menu", -1), null)
+  assert.strictEqual(M.sectionArgv(live(), "omarchy.power", 1), null)
+})
+
+test("the centre anchor reorders inside the centre but never leaves it", function() {
+  assert.ok(M.stepArgv(live(), "google-calendar.clock", -1))
+  assert.ok(M.stepArgv(live(), "google-calendar.clock", 1))
+  assert.strictEqual(M.sectionArgv(live(), "google-calendar.clock", -1), null)
+  assert.strictEqual(M.sectionArgv(live(), "google-calendar.clock", 1), null)
+})
+
+test("moves refuse a widget that is not on the bar", function() {
+  assert.strictEqual(M.stepArgv(live(), "omarchy.nope", 1), null)
+  assert.strictEqual(M.sectionArgv(live(), "", 1), null)
+  assert.strictEqual(M.stepArgv({}, "omarchy.menu", 1), null)
+})
+
 // ------------------------------------------------------------------------ run
 
 var failed = 0
