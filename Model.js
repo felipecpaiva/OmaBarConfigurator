@@ -377,6 +377,60 @@ function showSequence(saved, shellConfig, savedHidden) {
   return [placement].concat(restoreSettingsArgv(saved))
 }
 
+// --------------------------------------------------------------------- moving
+
+// Where a shown widget sits right now. null when it is not on the bar.
+function locate(shellConfig, id) {
+  var key = String(id || "")
+  if (!key) return null
+  for (var r = 0; r < REGIONS.length; r++) {
+    var entries = sectionEntries(shellConfig, REGIONS[r])
+    var index = indexOfId(entries, key)
+    if (index !== -1) return { section: REGIONS[r], region: r, index: index, entries: entries }
+  }
+  return null
+}
+
+// `omarchy bar move` keeps the whole entry object, inline settings and all
+// (PluginRegistry.moveBarEntry splices it out and back in), so a move needs no
+// capture and no settings restore. Its --index is resolved AFTER the entry is
+// spliced out of its source section. --from-section/--from-index pin the source
+// slot exactly, which matters for a widget that allows multiple instances.
+//
+// The centre anchor may reorder inside the centre but never leave it: that
+// would dangle bar.centerAnchor, and no CLI verb re-points it.
+function moveToArgv(shellConfig, id, loc, section, index) {
+  if (section !== loc.section && isCenterAnchor(shellConfig, id)) return null
+  return ["omarchy-bar", "move", String(id),
+          "--from-section", loc.section, "--from-index", String(loc.index),
+          "--section", section, "--index", String(index)]
+}
+
+// One step along the bar, reading left section -> center -> right as a single
+// list: stepping past the end of a section lands at the near end of the next.
+// delta is -1 (towards the left/top) or +1. null when there is nowhere to go.
+function stepArgv(shellConfig, id, delta) {
+  var loc = locate(shellConfig, id)
+  if (!loc || (delta !== -1 && delta !== 1)) return null
+  var target = loc.index + delta
+  if (target >= 0 && target < loc.entries.length)
+    return moveToArgv(shellConfig, id, loc, loc.section, target)
+  return sectionArgv(shellConfig, id, delta)
+}
+
+// Jump to the neighbouring section, landing on the edge nearest the one it
+// came from: the end of the section to the left, the start of the one to the
+// right.
+function sectionArgv(shellConfig, id, delta) {
+  var loc = locate(shellConfig, id)
+  if (!loc || (delta !== -1 && delta !== 1)) return null
+  var r = loc.region + delta
+  if (r < 0 || r >= REGIONS.length) return null
+  var section = REGIONS[r]
+  var index = delta < 0 ? sectionEntries(shellConfig, section).length : 0
+  return moveToArgv(shellConfig, id, loc, section, index)
+}
+
 // -------------------------------------------------------------- anchor safety
 
 // True when hiding `id` would un-pin the centre section. That requires the
@@ -438,6 +492,8 @@ if (typeof module !== "undefined") {
     showArgv: showArgv,
     restoreSettingsArgv: restoreSettingsArgv,
     showSequence: showSequence,
+    stepArgv: stepArgv,
+    sectionArgv: sectionArgv,
     isCenterAnchor: isCenterAnchor,
     nextAnchorAfterHiding: nextAnchorAfterHiding,
     // exported for the tests and for Panel.qml's own row rendering

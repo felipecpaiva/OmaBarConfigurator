@@ -580,6 +580,57 @@ Item {
     else showWidget(row)
   }
 
+  // ---- moving ----------------------------------------------------------
+  // The argv is built against the live file for the same reason a hide's
+  // capture is: the index a move names has to be the index the CLI will see.
+  // `followId` keeps the keyboard cursor on the widget once the list is
+  // rebuilt around its new slot.
+  property string followId: ""
+
+  function moveArgv(row, delta, acrossSections) {
+    if (!row || !row.visible) return null
+    try {
+      return acrossSections
+        ? Model.sectionArgv(root.liveConfig(), row.id, delta)
+        : Model.stepArgv(root.liveConfig(), row.id, delta)
+    } catch (e) {
+      console.warn("oma-bar-configurator: move of", row.id, "failed:", e)
+      return null
+    }
+  }
+
+  // Bound to a button's `enabled`, so it reads the rendered config, not the
+  // file: nothing here may block, and the click re-checks against the file.
+  function canMove(row, delta, acrossSections) {
+    if (!row || !row.visible || root.busy) return false
+    try {
+      return (acrossSections
+        ? Model.sectionArgv(root.shellConfig, row.id, delta)
+        : Model.stepArgv(root.shellConfig, row.id, delta)) !== null
+    } catch (e) {
+      return false
+    }
+  }
+
+  function moveAt(index, delta, acrossSections) {
+    var row = rowAt(index)
+    if (!row || root.busy) return
+    var argv = moveArgv(row, delta, acrossSections)
+    if (!argv) return
+    widgetList.keepContentY = widgetList.contentY
+    root.followId = row.id
+    runSequence([argv])
+  }
+
+  onRowsChanged: {
+    if (root.followId === "") return
+    for (var i = 0; i < rows.length; i++) {
+      if (rows[i].id !== root.followId) continue
+      root.cursorIndex = i
+      return
+    }
+  }
+
   function hideWidget(row) {
     if (isLocked(row)) return
     var captured = null
@@ -770,10 +821,19 @@ Item {
         anchors.bottomMargin: card.contentBottomInset
         anchors.leftMargin: card.contentLeftInset
 
-        onMoveRequested: function(dx, dy) { if (dy !== 0) root.moveCursor(dy) }
+        // j/k walk the list; h/l carry the widget under the cursor into the
+        // neighbouring section; Shift+J/K move it one slot.
+        onMoveRequested: function(dx, dy) {
+          if (dy !== 0) { root.followId = ""; root.moveCursor(dy) }
+          else if (dx !== 0 && root.cursorActive) root.moveAt(root.cursorIndex, dx, true)
+        }
         onActivateRequested: if (root.cursorActive) root.toggleAt(root.cursorIndex)
         onCloseRequested: root.dismiss()
-        onTextKey: function(t) { if (t === "u" || t === "U") root.restoreAll() }
+        onTextKey: function(t) {
+          if (t === "u" || t === "U") root.restoreAll()
+          else if (t === "K" && root.cursorActive) root.moveAt(root.cursorIndex, -1, false)
+          else if (t === "J" && root.cursorActive) root.moveAt(root.cursorIndex, 1, false)
+        }
 
       Column {
         id: content
@@ -1093,6 +1153,7 @@ Item {
       // Entering moves the cursor here; leaving does not clear it, so j/k
       // picks up from wherever the mouse last was.
       onContainsMouseChanged: if (containsMouse) {
+        root.followId = ""
         root.cursorActive = true
         root.cursorIndex = widgetRow.rowIndex
       }
@@ -1180,6 +1241,39 @@ Item {
         font.pixelSize: Style.font.caption
       }
 
+      // Move controls, on the row under the cursor only: fifteen rows of four
+      // arrows each would bury the names. Outer pair jumps a section, inner
+      // pair steps one slot (crossing into the next section at either end).
+      Row {
+        id: moveControls
+        visible: widgetRow.shown && widgetRow.hasCursor
+        anchors.right: rowState.visible ? rowState.left : rowSwitch.left
+        anchors.rightMargin: Style.space(6)
+        anchors.verticalCenter: parent.verticalCenter
+        spacing: Style.space(2)
+
+        Repeater {
+          model: [
+            { glyph: "󰁍", delta: -1, across: true, tip: "Move to the previous section" },
+            { glyph: "󰁝", delta: -1, across: false, tip: "Move up one slot" },
+            { glyph: "󰁅", delta: 1, across: false, tip: "Move down one slot" },
+            { glyph: "󰁔", delta: 1, across: true, tip: "Move to the next section" }
+          ]
+
+          delegate: PanelActionButton {
+            required property var modelData
+            iconText: modelData.glyph
+            tooltipText: modelData.tip
+            fontSize: Style.font.bodySmall
+            size: Style.space(20)
+            foreground: root.foreground
+            fontFamily: root.fontFamily
+            enabled: root.canMove(widgetRow.row, modelData.delta, modelData.across)
+            onClicked: root.moveAt(widgetRow.rowIndex, modelData.delta, modelData.across)
+          }
+        }
+      }
+
       // One line, always. A second line under the name is what made the anchor
       // row 4px taller than its neighbours and put a visible stumble in the
       // list's pitch; the state it carried now rides beside the switch.
@@ -1188,7 +1282,8 @@ Item {
         textFormat: Text.PlainText
         anchors.left: rowGlyph.right
         anchors.leftMargin: Style.space(10)
-        anchors.right: rowState.visible ? rowState.left : rowSwitch.left
+        anchors.right: moveControls.visible ? moveControls.left
+          : (rowState.visible ? rowState.left : rowSwitch.left)
         anchors.rightMargin: Style.space(10)
         anchors.verticalCenter: parent.verticalCenter
         text: root.widgetName(widgetRow.row.id)
