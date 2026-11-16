@@ -26,6 +26,7 @@ Ranked by lowest resource cost first, then most customization. Verdicts approved
 | 13 | Indicators always shown, tray arrow only when needed | Islands Bar | needs copied widgets | skip | |
 | 14 | CPU and GPU cards with charts | Denial | polling | skip, use an existing plugin | |
 | 15 | Move a whole pill to left, center or right from the panel | Felipe | none | now | 4 |
+| 16 | Real spacing between widgets, so padding and split gaps match Denial | Felipe | unknown | later, needs research | |
 
 ## Batches
 
@@ -101,3 +102,10 @@ Each batch ends green on `bash test/run-all.sh` and is logged in `docs/batch-log
    per section; the user adds breaks.
 4. (2026-11-16) Row 15, move a whole pill to left, center or right, ships in batch 4 with presets,
    with Undo through the same layout snapshot.
+5. (2026-11-16) Spacing, option A: keep one pill per section as the look for now. Widgets touch,
+   so splits overlap a few pixels and the outer padding is smaller than 12 px. Real spacing is a
+   later setting (row 16).
+6. (2026-11-16) Settings are grouped by topic, like omahop: one spec file (`settings/spec.json`)
+   defines every setting with its topic, subgroup, help and advanced flag; the panel shows one
+   topic at a time (Widgets, Pills, Groups, Bar) and a new topic needs no panel code. Defaults stay
+   in `lib/PillStyle.js` only.

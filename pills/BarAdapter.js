@@ -16,6 +16,7 @@ var NAMES = {
 
 // Section region -> pill area. The tray drawer list is not on the bar line.
 var AREA_OF = { left: "left", centerBegin: "center", center: "center", centerEnd: "center", right: "right" }
+var TRAY_REGION = "tray"
 
 function hasAll(item, names) {
   if (!item) return false
@@ -58,10 +59,15 @@ function findAreas(root, warn) {
   collectLists(root, found)
   var areas = { left: [], center: [], right: [] }
   var count = 0
+  var unknown = []
   for (var i = 0; i < found.length; i++) {
-    var area = AREA_OF[found[i].region]
+    var region = found[i].region
+    var area = AREA_OF[region]
     if (area) { areas[area].push(found[i]); count++ }
+    else if (region !== TRAY_REGION && unknown.indexOf(String(region)) < 0) unknown.push(String(region))
   }
+  // Omarchy may have renamed a region: say so once, the rest still draws.
+  if (unknown.length) warn("unknown bar region " + unknown.join(", ") + " (expected " + Object.keys(AREA_OF).concat(TRAY_REGION).join(", ") + ")")
   if (!count) { warn("no bar sections found (" + NAMES.ModuleList.join(", ") + ")"); return null }
   return areas
 }

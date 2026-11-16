@@ -25,7 +25,7 @@ fi
 step "private bar names only in pills/BarAdapter.js"
 # Qt 6.12 ships its own Color singleton that hides qs.Commons Color, so every
 # use must be Commons.Color (commit af4ae61, omacom/omarchy#14553).
-if hits=$(grep -nE '(^|[^.A-Za-z_])Color\.' pills/*.qml Panel.qml); then
+if hits=$(grep -nE '(^|[^.A-Za-z_])Color\.' pills/*.qml panel/*.qml Panel.qml); then
   echo "$hits"; echo "FAIL unqualified Color: use Commons.Color"; failed=1
 else
   echo "OK qualified Color"
@@ -42,14 +42,19 @@ step "qmllint"
 if [[ ! -x "$QMLLINT" ]]; then
   echo "SKIP qmllint"
 else
-  # Quickshell types (qs.Commons, Style, ...) do not resolve outside the shell, so every
-  # Style.* use reports [unqualified]: pure noise, allowed. [missing-property] is also allowed
-  # as the Panel.qml:1211 `parent.cellWidth` baseline (dynamic property on parent).
-  # Anything else, and every Error, fails. Tighten ALLOW when that baseline is fixed.
-  ALLOW='unqualified|missing-property'
+  # Quickshell maps the module name `qs` to Omarchy's shell folder, so a temp dir with a `qs`
+  # link makes qs.Commons and qs.Ui resolve for real. Two blind spots remain and are allowed:
+  # [unqualified] (shell singletons seen through the root scope) and [missing-property] on the
+  # generic types "QObject" (Style.font.caption and other nested groups) and "QQuickItem"
+  # (`parent.x` on an untyped parent). Everything else fails, including any misspelled property
+  # on a concrete type.
+  QS_ROOT=$(mktemp -d)
+  trap 'rm -rf "$QS_ROOT"' EXIT
+  ln -s "${OMARCHY_PATH:-/usr/share/omarchy}/shell" "$QS_ROOT/qs"
   while IFS= read -r -d '' f; do
-    out=$("$QMLLINT" "$f" 2>&1) || { echo "$out"; echo "FAIL qmllint $f"; failed=1; continue; }
-    bad=$(grep -E '^(Warning|Error)' <<<"$out" | grep -vE "\[($ALLOW)\]" || true)
+    out=$("$QMLLINT" -I "$QS_ROOT" "$f" 2>&1) || { echo "$out"; echo "FAIL qmllint $f"; failed=1; continue; }
+    bad=$(grep -E '^(Warning|Error)' <<<"$out" | grep -vE '\[unqualified\]' \
+      | grep -vE 'not found on type "(QObject|QQuickItem)" \[missing-property\]' || true)
     if [[ -n "$bad" ]]; then echo "$bad"; echo "FAIL qmllint $f"; failed=1; else echo "OK qmllint $f"; fi
   done < <(git ls-files -z --cached --others --exclude-standard '*.qml')
 fi

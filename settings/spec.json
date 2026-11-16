@@ -1,0 +1,63 @@
+{
+  "version": 1,
+  "groups": [
+    { "id": "widgets", "title": "Widgets", "page": "widgets" },
+    {
+      "id": "pills",
+      "title": "Pills",
+      "settings": [
+        { "id": "style.enabled", "target": "style", "key": "enabled", "type": "toggle",
+          "label": "Show pills", "subgroup": "Basics", "needs": "", "disabledBy": "",
+          "help": "Draw a rounded shape behind each group of widgets. Off by default, so the bar keeps its stock look until you turn this on." },
+
+        { "id": "style.radius", "target": "style", "key": "radius", "type": "number", "unit": "px", "step": 1,
+          "label": "Corner radius", "subgroup": "Shape", "needs": "style.enabled", "disabledBy": "style.radiusFollowsWindows",
+          "help": "How round the corners are. The default is 999, which is fully round (a capsule). 0 is square." },
+        { "id": "style.radiusFollowsWindows", "target": "style", "key": "radiusFollowsWindows", "type": "toggle",
+          "label": "Match window corners", "subgroup": "Shape", "needs": "style.enabled", "disabledBy": "",
+          "help": "Use the same corner rounding as your windows, so the bar and the windows look alike. Off by default. While on, the corner radius setting is not used." },
+        { "id": "style.padding", "target": "style", "key": "padding", "type": "number", "unit": "px", "step": 1,
+          "label": "Inner padding", "subgroup": "Shape", "needs": "style.enabled", "disabledBy": "",
+          "help": "Space between the edge of a pill and the widgets inside it. The default is 12 px." },
+        { "id": "style.inset", "target": "style", "key": "inset", "type": "number", "unit": "px", "step": 1, "advanced": true,
+          "label": "Space above and below", "subgroup": "Shape", "needs": "style.enabled", "disabledBy": "",
+          "help": "Gap between a pill and the top and bottom edge of the bar. The default is 5 px." },
+        { "id": "style.gap", "target": "style", "key": "gap", "type": "number", "unit": "px", "step": 1,
+          "label": "Gap between pills", "subgroup": "Shape", "needs": "style.enabled", "disabledBy": "",
+          "help": "Space between one pill and the next. The default is 8 px." },
+
+        { "id": "style.color", "target": "style", "key": "color", "type": "color",
+          "values": ["background", "foreground", "accent", "urgent", "muted"],
+          "names": { "background": "Background", "foreground": "Text", "accent": "Accent", "urgent": "Urgent", "muted": "Muted" },
+          "label": "Fill color", "subgroup": "Color", "needs": "style.enabled", "disabledBy": "",
+          "help": "A color from your theme, so pills follow the theme when you switch it. Or type your own #rrggbb. The default is Background." },
+        { "id": "style.fillOpacity", "target": "style", "key": "fillOpacity", "type": "number", "step": 0.05,
+          "label": "Fill opacity", "subgroup": "Color", "needs": "style.enabled", "disabledBy": "",
+          "help": "0 is see-through and 1 is solid. The default is 0.85." },
+        { "id": "style.borderColor", "target": "style", "key": "borderColor", "type": "color", "advanced": true,
+          "values": ["background", "foreground", "accent", "urgent", "muted"],
+          "names": { "background": "Background", "foreground": "Text", "accent": "Accent", "urgent": "Urgent", "muted": "Muted" },
+          "label": "Border color", "subgroup": "Color", "needs": "style.enabled", "disabledBy": "",
+          "help": "Color of the thin line around a pill. Same choices as the fill color. The default is Text." },
+        { "id": "style.borderOpacity", "target": "style", "key": "borderOpacity", "type": "number", "step": 0.02, "advanced": true,
+          "label": "Border opacity", "subgroup": "Color", "needs": "style.enabled", "disabledBy": "",
+          "help": "0 hides the border and 1 is solid. The default is 0.12, a faint line." },
+        { "id": "style.borderWidth", "target": "style", "key": "borderWidth", "type": "number", "unit": "px", "step": 1, "advanced": true,
+          "label": "Border width", "subgroup": "Color", "needs": "style.enabled", "disabledBy": "",
+          "help": "Thickness of the border. 0 means no border. The default is 1 px." }
+      ]
+    },
+    { "id": "groups", "title": "Groups", "page": "GroupsPage" },
+    {
+      "id": "bar",
+      "title": "Bar",
+      "settings": [
+        { "id": "bar.background", "target": "bar", "key": "background", "type": "choice",
+          "values": ["opaque", "glassy", "none"],
+          "names": { "opaque": "Solid", "glassy": "Glass", "none": "Clear" },
+          "label": "Bar background", "subgroup": "Background", "needs": "", "disabledBy": "",
+          "help": "Solid is a plain bar, Glass lets the wallpaper show through a little, Clear has no background at all. This changes the stock Omarchy bar setting." }
+      ]
+    }
+  ]
+}

@@ -57,12 +57,10 @@ Item {
   readonly property color hoverFill: Style.hoverFillFor(foreground, Commons.Color.accent)
   readonly property color selectedFill: Style.selectedFillFor(foreground, Commons.Color.accent)
 
-  // Bar-wide transparency, the one other boolean `omarchy bar` owns. Read from
-  // the same detached config the layout comes from.
-  readonly property bool barTransparent: {
-    var cfg = root.shellConfig
-    return !!(cfg && cfg.bar && cfg.bar.transparent === true)
-  }
+  // The header's transparency switch is a view of bar.background ("none" means
+  // clear), so it agrees with the Bar topic; `omarchy bar background` drops the
+  // old bar.transparent key.
+  readonly property bool barTransparent: root.barBackground === "none"
 
   // ---- config ---------------------------------------------------------
   // `shell.barConfig` is a detached copy of the `bar` object, refreshed by the
@@ -384,6 +382,7 @@ Item {
     // cannot throw its way past the rest of this function.
     try { JSON.parse(payloadJson || "{}") } catch (e) {}
     store.reload()
+    refreshLive()
     refreshPluginInfo()
     refreshGeometry()
     root.cursorActive = false
@@ -426,10 +425,11 @@ Item {
   FileView {
     id: store
     path: root.storePath
-    watchChanges: false
+    watchChanges: true
     atomicWrites: true
     printErrors: false
     onLoaded: root.loadStore(text())
+    onFileChanged: reload()
     // First run: no file yet. Without this branch the store never reports
     // loaded and the first hide would have nowhere to record its entry.
     onLoadFailed: root.loadStore("")
@@ -440,6 +440,9 @@ Item {
   property string lastRawText: ""
 
   function loadStore(raw) {
+    // Our own setText comes back through the watch with the text we already
+    // hold; skipping it keeps a write from rebuilding the list a second time.
+    if (root.storeLoaded && String(raw || "") === root.lastRawText) return
     root.lastRawText = String(raw || "")
     var parsed = PillStyle.readStore(root.lastRawText)
     for (var i = 0; i < parsed.warnings.length; i++)
@@ -449,10 +452,175 @@ Item {
   }
 
   function persistStore() {
-    var text = PillStyle.writeStore(root.lastRawText, { hidden: root.savedHidden })
+    persistPatch({ hidden: root.savedHidden })
+  }
+
+  function persistPatch(patch) {
+    var text = PillStyle.writeStore(root.lastRawText, patch)
     root.lastRawText = text
     store.setText(text)
   }
+
+  // ---- settings API (the pages under panel/ code against these) --------
+  readonly property var storeData: PillStyle.readStore(root.lastRawText)
+
+  // Refused before the store has loaded: merging onto an empty text would
+  // write a file without the hidden list.
+  function writeStyle(patch) {
+    if (!root.storeLoaded || !patch) return
+    var merged = ({})
+    var current = root.storeData.style
+    for (var k in current) merged[k] = current[k]
+    for (var p in patch) merged[p] = patch[p]
+    persistPatch({ style: merged })
+  }
+
+  function writeBreaks(area, ids) {
+    var areas = ["left", "center", "right"]
+    if (!root.storeLoaded || areas.indexOf(String(area)) < 0) return
+    var breaks = ({})
+    for (var i = 0; i < areas.length; i++) {
+      var list = areas[i] === String(area) ? (ids || []) : root.storeData.groups.breaks[areas[i]]
+      // Copied element by element: a host array fails Array.isArray (FINDINGS.md).
+      var copy = []
+      for (var j = 0; j < list.length; j++) copy.push(String(list[j]))
+      breaks[areas[i]] = copy
+    }
+    persistPatch({ groups: { breaks: breaks } })
+  }
+
+  // The live `bar` object from shell.json, a plain JSON copy. Re-read on
+  // open, when the host pushes a new barConfig, and after our own commands:
+  // the host does not push one for a background change.
+  property var liveBar: ({})
+  readonly property var liveLayout: (liveBar && liveBar.layout) ? liveBar.layout : ({})
+  readonly property var backgroundValues: ["opaque", "glassy", "none"]
+  // Same fallback as `omarchy-bar`: an old config says transparent instead.
+  readonly property string barBackground: {
+    var value = liveBar ? String(liveBar.background || "") : ""
+    if (backgroundValues.indexOf(value) >= 0) return value
+    return (liveBar && liveBar.transparent === true) ? "none" : "opaque"
+  }
+
+  function refreshLive() {
+    var cfg = root.liveConfig()
+    root.liveBar = (cfg && cfg.bar) ? cfg.bar : ({})
+  }
+
+  onShellConfigChanged: refreshLive()
+
+  function setBarBackground(value) {
+    var v = String(value)
+    if (root.busy || backgroundValues.indexOf(v) < 0 || v === root.barBackground) return
+    runSequence([["omarchy-bar", "background", v]])
+  }
+
+  function settingValue(setting) {
+    if (!setting) return undefined
+    var key = String(setting.key || "")
+    if (setting.target === "style") return root.storeData.style[key]
+    if (setting.target === "bar" && key === "background") return root.barBackground
+    console.warn("oma-bar-configurator: unknown setting target:", setting.target, key)
+    return undefined
+  }
+
+  function setSetting(setting, value) {
+    if (!setting) return
+    var key = String(setting.key || "")
+    if (setting.target === "style") {
+      var patch = ({})
+      patch[key] = value
+      writeStyle(patch)
+    } else if (setting.target === "bar" && key === "background") {
+      setBarBackground(value)
+    } else {
+      console.warn("oma-bar-configurator: unknown setting target:", setting.target, key)
+    }
+  }
+
+  // ---- categories (settings/spec.json) ----------------------------------
+  // One topic shown at a time, in the spec's group order. A missing or bad
+  // spec leaves the one Widgets topic, which is the panel as it was.
+  readonly property var fallbackCategories: [{ id: "widgets", title: "Widgets", page: "widgets" }]
+  property var categories: fallbackCategories
+  property string categoryId: "widgets"
+  readonly property var currentGroup: {
+    for (var i = 0; i < categories.length; i++)
+      if (categories[i].id === root.categoryId) return categories[i]
+    return categories[0]
+  }
+  readonly property bool onWidgetsPage: currentGroup.page === "widgets"
+
+  FileView {
+    id: specFile
+    path: {
+      var url = String(Qt.resolvedUrl("settings/spec.json"))
+      return url.indexOf("file://") === 0 ? decodeURIComponent(url.slice(7)) : ""
+    }
+    watchChanges: false
+    printErrors: false
+    onLoaded: root.loadSpec(text())
+    onLoadFailed: root.loadSpec("")
+  }
+
+  function loadSpec(raw) {
+    var groups = []
+    try {
+      var spec = JSON.parse(String(raw || "") || "{}")
+      var list = (spec && spec.groups && typeof spec.groups.length === "number") ? spec.groups : []
+      for (var i = 0; i < list.length; i++) {
+        var g = list[i]
+        if (!g || typeof g.id !== "string" || g.id === "") continue
+        if (typeof g.page !== "string" && !(g.settings && typeof g.settings.length === "number")) continue
+        groups.push(g)
+      }
+    } catch (e) {
+      console.warn("oma-bar-configurator: settings/spec.json unreadable:", e)
+    }
+    if (groups.length === 0 && String(raw || "") !== "")
+      console.warn("oma-bar-configurator: settings/spec.json has no usable groups, showing widgets only")
+    root.categories = groups.length > 0 ? groups : root.fallbackCategories
+  }
+
+  function selectCategory(id) {
+    root.categoryId = String(id)
+    root.cursorActive = false
+    keyCatcher.forceActiveFocus()
+  }
+
+  function stepCategory(delta) {
+    var n = categories.length
+    if (n < 2) return
+    var at = 0
+    for (var i = 0; i < n; i++) if (categories[i].id === currentGroup.id) at = i
+    selectCategory(categories[((at + delta) % n + n) % n].id)
+  }
+
+  // panel/<Name>.qml for a named page, panel/SettingsPage.qml for a settings
+  // group. The name comes from a file, so it may only be a plain identifier.
+  function pageUrl(group) {
+    var name = typeof group.page === "string" ? group.page : "SettingsPage"
+    if (!/^[A-Za-z][A-Za-z0-9]*$/.test(name)) {
+      console.warn("oma-bar-configurator: bad page name in spec:", name)
+      return ""
+    }
+    return Qt.resolvedUrl("panel/" + name + ".qml")
+  }
+
+  function loadPage() {
+    var group = root.currentGroup
+    if (!win.visible || !group || group.page === "widgets") { pageLoader.source = ""; return }
+    var url = pageUrl(group)
+    if (url === "") { pageLoader.source = ""; return }
+    var props = typeof group.page === "string" ? { panel: root } : { panel: root, group: group }
+    // Cleared first: two settings groups share SettingsPage.qml, and a Loader
+    // may keep the old item when the url has not changed.
+    pageLoader.source = ""
+    pageScroll.contentY = 0
+    pageLoader.setSource(url, props)
+  }
+
+  onCurrentGroupChanged: loadPage()
 
   // ---- live config -----------------------------------------------------
   // `shell.barConfig` is fine to RENDER from and not safe to DECIDE from. It
@@ -494,6 +662,7 @@ Item {
 
   Component.onCompleted: {
     store.reload()
+    refreshLive()
     refreshPluginInfo()
     refreshGeometry()
   }
@@ -534,6 +703,7 @@ Item {
       // actually be inserted into.
       if (root.restoreQueue.length > 0) { stepRestoreQueue(); return }
       pruneRestoredStore()
+      refreshLive()
       // Widget names and clone sources change with what is enabled, and so
       // does which slots are drawing.
       refreshPluginInfo()
@@ -570,8 +740,7 @@ Item {
   }
 
   function setBarTransparent(value) {
-    if (root.busy) return
-    runSequence([["omarchy-bar", "transparent", value ? "true" : "false"]])
+    setBarBackground(value ? "none" : "opaque")
   }
 
   function toggleAt(index) {
@@ -696,6 +865,7 @@ Item {
 
   // ---- window ----------------------------------------------------------
   readonly property int gap: Style.gapsOut
+  readonly property real categoryBarExtent: root.categories.length > 1 ? categoryBar.height + content.spacing : 0
   readonly property int margin: Style.gapsOut
 
   PanelWindow {
@@ -704,6 +874,9 @@ Item {
     visible: root.opened || card.opacity > 0
     color: "transparent"
     exclusionMode: ExclusionMode.Ignore
+
+    // A page is built only while the card is on screen; zero cost when closed.
+    onVisibleChanged: root.loadPage()
 
     WlrLayershell.namespace: "omabarconfigurator"
     WlrLayershell.layer: WlrLayer.Overlay
@@ -774,10 +947,13 @@ Item {
         anchors.bottomMargin: card.contentBottomInset
         anchors.leftMargin: card.contentLeftInset
 
-        onMoveRequested: function(dx, dy) { if (dy !== 0) root.moveCursor(dy) }
-        onActivateRequested: if (root.cursorActive) root.toggleAt(root.cursorIndex)
+        // The list keys act only while the list is the page on show; Tab
+        // and Shift+Tab step through the topics.
+        onMoveRequested: function(dx, dy) { if (dy !== 0 && root.onWidgetsPage) root.moveCursor(dy) }
+        onActivateRequested: if (root.cursorActive && root.onWidgetsPage) root.toggleAt(root.cursorIndex)
         onCloseRequested: root.dismiss()
-        onTextKey: function(t) { if (t === "u" || t === "U") root.restoreAll() }
+        onTabRequested: function(direction) { root.stepCategory(direction) }
+        onTextKey: function(t) { if ((t === "u" || t === "U") && root.onWidgetsPage) root.restoreAll() }
 
       Column {
         id: content
@@ -786,11 +962,44 @@ Item {
         anchors.top: parent.top
         spacing: Style.space(12)
 
+        // The topic switcher: one equal-width chip per spec group, built like
+        // the bar position row so any number of topics fits the card. Hidden
+        // with one topic, so a spec-less install looks as before.
+        Row {
+          id: categoryBar
+          width: parent.width
+          visible: root.categories.length > 1
+          spacing: Style.space(6)
+
+          readonly property real cellWidth:
+            (width - spacing * Math.max(0, root.categories.length - 1)) / Math.max(1, root.categories.length)
+
+          Repeater {
+            model: root.categories
+
+            delegate: Button {
+              required property var modelData
+              width: categoryBar.cellWidth
+              text: String(modelData.title || modelData.id)
+              tooltipText: "Tab and Shift+Tab switch topics"
+              fontSize: Style.font.bodySmall
+              fontFamily: root.fontFamily
+              foreground: root.foreground
+              horizontalPadding: Style.spacing.controlPaddingX
+              verticalPadding: Style.spacing.controlPaddingY + Style.space(2)
+              bordered: true
+              active: root.currentGroup.id === modelData.id
+              onClicked: root.selectCategory(modelData.id)
+            }
+          }
+        }
+
         // Everything above the list. Its height is independent of the list's,
         // which is what lets the list cap itself against the space left over
         // without the two forming a binding loop.
         Column {
           id: headBlock
+          visible: root.onWidgetsPage
           width: parent.width
           spacing: Style.space(12)
 
@@ -940,6 +1149,7 @@ Item {
         // list outgrows the card.
         ListView {
           id: widgetList
+          visible: root.onWidgetsPage
           width: parent.width
           // Two caps. The screen one is the hard limit; the second keeps a bar
           // with a lot of widgets from growing a card the height of the
@@ -948,7 +1158,8 @@ Item {
           // the room for them.
           readonly property real capHeight: Math.min(contentHeight, Style.space(560),
             Math.max(Style.space(120),
-              win.availableHeight - card.verticalInset - headBlock.implicitHeight - content.spacing))
+              win.availableHeight - card.verticalInset - headBlock.implicitHeight - content.spacing
+                - root.categoryBarExtent))
 
           // Whatever the caps land on, the viewport ends on a row boundary. A
           // row cut through its own middle reads as a clipping bug, not as
@@ -1046,6 +1257,29 @@ Item {
                 rowIndex: parent.parent.index
               }
             }
+          }
+        }
+
+        // Every topic other than Widgets. The page takes its natural height;
+        // past what the card has left, it scrolls here, so pages need not.
+        Flickable {
+          id: pageScroll
+          visible: !root.onWidgetsPage
+          width: parent.width
+          contentHeight: pageLoader.height
+          height: Math.min(contentHeight,
+            Math.max(Style.space(120), win.availableHeight - card.verticalInset - root.categoryBarExtent))
+          clip: true
+          boundsBehavior: Flickable.StopAtBounds
+          interactive: contentHeight > height
+
+          ScrollBar.vertical: ScrollBar { policy: ScrollBar.AsNeeded }
+
+          Loader {
+            id: pageLoader
+            width: pageScroll.width
+            onStatusChanged: if (status === Loader.Error)
+              console.warn("oma-bar-configurator: page failed to load:", source)
           }
         }
       }

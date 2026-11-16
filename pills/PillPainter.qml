@@ -39,7 +39,8 @@ BarWidget {
   readonly property var look: ({
     vertical: root.vertical,
     inset: style.inset,
-    cornerRadius: style.radius,
+    // Style.cornerRadius mirrors Hyprland's decoration:rounding and refreshes on configreloaded (no Process or timer here).
+    cornerRadius: style.radiusFollowsWindows ? Style.cornerRadius : style.radius,
     fillColor: PillStyle.resolveColor(style.color, themeColors, themeColors.background),
     fillOpacity: style.fillOpacity,
     edgeColor: PillStyle.resolveColor(style.borderColor, themeColors, themeColors.foreground),
@@ -73,7 +74,7 @@ BarWidget {
   function warnOnce(message) {
     if (warned) return
     warned = true
-    console.warn("OmaBar pills: " + message + "; drawing no pills")
+    console.warn("OmaBar pills: " + message)
   }
 
   function scan() {
@@ -125,7 +126,16 @@ BarWidget {
     onLoadFailed: root.storeText = ""
   }
 
-  onStoreChanged: if (store.warnings.length) console.warn("OmaBar pills: " + store.warnings.join("; "))
+  // The file changes often: each distinct store warning is logged once per painter.
+  property var seenWarnings: ({})
+  onStoreChanged: {
+    for (var i = 0; i < store.warnings.length; i++) {
+      var w = store.warnings[i]
+      if (seenWarnings[w]) continue
+      seenWarnings[w] = true
+      console.warn("OmaBar pills: " + w)
+    }
+  }
 
   Component {
     id: shapeComponent

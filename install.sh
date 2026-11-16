@@ -15,7 +15,7 @@ shopt -s nullglob
 rm -rf "$PLUGIN_DEST"
 mkdir -p "$PLUGIN_DEST"
 cp -f "$REPO_DIR/manifest.json" "$REPO_DIR"/*.qml "$REPO_DIR"/*.js "$PLUGIN_DEST/"
-for dir in lib pills; do
+for dir in lib pills panel settings; do
   cp -r "$REPO_DIR/$dir" "$PLUGIN_DEST/"
 done
 omarchy plugin validate "$PLUGIN_DEST"

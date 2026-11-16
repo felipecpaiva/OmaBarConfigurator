@@ -23,6 +23,16 @@ test("wrong types fall back with one warning each", function() {
   assert.strictEqual(n.style.radius, 999)
   assert.ok(n.warnings.some(function(w) { return w.indexOf("style.gap") >= 0 }))
 })
+test("LIMITS cover every number default and radiusFollowsWindows is a boolean", function() {
+  Object.keys(P.DEFAULTS).forEach(function(k) {
+    if (typeof P.DEFAULTS[k] === "number") assert.ok(P.LIMITS[k], k)
+  })
+  assert.strictEqual(P.DEFAULTS.radiusFollowsWindows, false)
+  assert.strictEqual(P.normalize({ radiusFollowsWindows: true }).style.radiusFollowsWindows, true)
+  var n = P.normalize({ radiusFollowsWindows: "yes" })
+  assert.strictEqual(n.style.radiusFollowsWindows, false)
+  assert.strictEqual(n.warnings.length, 1)
+})
 test("valid values are kept", function() {
   var s = P.normalize({ enabled: true, color: "#112233", borderColor: "accent", gap: 4 }).style
   assert.deepStrictEqual([s.enabled, s.color, s.borderColor, s.gap], [true, "#112233", "accent", 4])

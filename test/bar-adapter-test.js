@@ -123,6 +123,15 @@ var w2 = warnings()
 assert.strictEqual(A.findAreas(node({}, [node({})]), w2), null)
 assert.strictEqual(w2.list.length, 1)
 
+// A renamed region warns once (not per list); known lists still count.
+var w3 = warnings()
+function bare(region) { return node({ listRows: [], keys: [], region: region, pool: {} }) }
+var odd = node({}, [bare("left"), bare("leftish"), bare("leftish")])
+var oddAreas = A.findAreas(odd, w3)
+assert.strictEqual(w3.list.length, 1)
+assert.strictEqual(oddAreas.left.length, 1)
+assert.ok(w3.list[0].indexOf("leftish") >= 0)
+
 // A widget waiting in the pool (no slot) still locates its surface.
 var pooled = surface()
 pooled.widget.parent.parent.owner = null
