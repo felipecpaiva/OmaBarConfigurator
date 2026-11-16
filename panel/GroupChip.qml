@@ -130,14 +130,13 @@ Item {
     readonly property bool strong: chip.cursorOnSeam || seamMouse.containsMouse
     readonly property string word: ({ split: "split", join: "joined", locked: "locked", off: "cannot split" })[chip.seam.state]
 
-    // Split: a 2 px line in the gap. Join: a faint 1 px line, full on hover or cursor.
+    // Split: a 2 px line in the gap. Join: no line until hover or cursor, so the band reads as one pill.
     Rectangle {
-      visible: chip.seam.state === "split" || chip.seam.state === "join"
+      visible: chip.seam.state === "split" || (chip.seam.state === "join" && seamItem.strong)
       anchors.centerIn: parent
       width: chip.seam.state === "split" || seamItem.strong ? 2 : 1
       height: parent.height * 0.6
       color: seamItem.strong ? chip.foreground : chip.dim
-      opacity: chip.seam.state === "join" && !seamItem.strong ? 0.35 : 1
     }
     // Locked: a dotted line, so a forced split reads apart from a chosen one.
     Column {

@@ -25,9 +25,7 @@ Column {
   Repeater {
     model: [
       { show: !page.pillsOn, text: "Pills are off. Turn them on in Pills to see groups on the bar." },
-      { show: true, text: "By default each section is one pill. Click between two icons to split or join." },
-      { show: true, text: "Own gives a widget a pill of its own. None draws no pill, for widgets with their own background." },
-      { show: true, text: "Keys: arrows move, Space splits or joins, S O N set Shared, Own, None, Ctrl+Up or Down moves the pill." }
+      { show: true, text: "Click between two icons to split or join a pill. Click an icon for its options." }
     ]
 
     Text {
@@ -54,7 +52,7 @@ Column {
       anchors.verticalCenter: parent.verticalCenter
       textFormat: Text.PlainText
       wrapMode: Text.WordWrap
-      text: "Split the center into three pills"
+      text: "Own pills before and after the clock"
       color: page.foreground
       font.family: page.fontFamily
       font.pixelSize: Style.font.body
@@ -69,16 +67,6 @@ Column {
       foreground: page.foreground
       onToggled: page.panel.setCenterParts(!page.centerParts)
     }
-  }
-
-  Text {
-    width: parent.width
-    textFormat: Text.PlainText
-    wrapMode: Text.WordWrap
-    text: "The widgets before the clock, the clock group, and the widgets after the clock each get their own pill. Off by default."
-    color: page.dim
-    font.family: page.fontFamily
-    font.pixelSize: Style.font.caption
   }
 
   Text {
@@ -106,16 +94,6 @@ Column {
     }
   }
 
-  Text {
-    width: parent.width
-    textFormat: Text.PlainText
-    wrapMode: Text.WordWrap
-    text: "A widget that is hidden on the bar still shows here."
-    color: page.dim
-    font.family: page.fontFamily
-    font.pixelSize: Style.font.caption
-  }
-
   Rectangle {
     width: parent.width
     height: 1
@@ -129,5 +107,16 @@ Column {
     foreground: page.foreground
     dim: page.dim
     fontFamily: page.fontFamily
+  }
+
+  Text {
+    width: parent.width
+    textFormat: Text.PlainText
+    wrapMode: Text.WordWrap
+    text: "Keys: arrows move, Space splits or joins, S O N set Shared, Own, None, Ctrl+Up or Down moves the pill. Widgets hidden on the bar still show here."
+    color: page.dim
+    opacity: 0.8
+    font.family: page.fontFamily
+    font.pixelSize: Style.font.caption
   }
 }
