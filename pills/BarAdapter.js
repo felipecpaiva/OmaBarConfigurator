@@ -137,10 +137,25 @@ var ALIGN = { h: { end: 2, center: 4 }, v: { end: 64, center: 128 } }
 function inkSpan(slot, vertical) {
   var lo = Infinity, hi = -Infinity
   var align = vertical ? ALIGN.v : ALIGN.h
-  function add(a, b) { if (b > a) { lo = Math.min(lo, a); hi = Math.max(hi, b) } }
+  // [cl, ch]: the window a clipping ancestor leaves open; content outside it is not drawn.
+  var cl = -Infinity, ch = Infinity
+  function add(a, b) {
+    a = Math.max(a, cl); b = Math.min(b, ch)
+    if (b > a) { lo = Math.min(lo, a); hi = Math.max(hi, b) }
+  }
   function walk(it, off, depth) {
-    if (!it || it.visible === false || it.opacity === 0 || depth > 48) return
+    if (!it || it.visible === false || it.opacity === 0 || it.scale === 0 || depth > 48) return
     var pos = off + (vertical ? it.y : it.x), len = vertical ? it.height : it.width
+    if (it.clip === true) {
+      var saveL = cl, saveH = ch
+      cl = Math.max(cl, pos); ch = Math.min(ch, pos + len)
+      walkInside(it, pos, len, depth)
+      cl = saveL; ch = saveH
+      return
+    }
+    walkInside(it, pos, len, depth)
+  }
+  function walkInside(it, pos, len, depth) {
     // Omarchy's OpticalGlyph knows its own drawn ink (Ui/OpticalGlyph.qml).
     if (typeof it.text === "string" && "paintedCenterX" in it && "paintedWidth" in it) {
       if (it.text === "") return
