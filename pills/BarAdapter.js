@@ -139,8 +139,15 @@ function inkSpan(slot, vertical) {
   var align = vertical ? ALIGN.v : ALIGN.h
   function add(a, b) { if (b > a) { lo = Math.min(lo, a); hi = Math.max(hi, b) } }
   function walk(it, off, depth) {
-    if (!it || it.visible === false || it.opacity === 0 || depth > 16) return
+    if (!it || it.visible === false || it.opacity === 0 || depth > 48) return
     var pos = off + (vertical ? it.y : it.x), len = vertical ? it.height : it.width
+    // Omarchy's OpticalGlyph knows its own drawn ink (Ui/OpticalGlyph.qml).
+    if (typeof it.text === "string" && "paintedCenterX" in it && "paintedWidth" in it) {
+      if (it.text === "") return
+      var c = vertical ? it.paintedCenterY : it.paintedCenterX, half = (vertical ? it.paintedHeight : it.paintedWidth) / 2
+      add(pos + c - half, pos + c + half)
+      return
+    }
     if (typeof it.text === "string" && "contentWidth" in it) {
       if (it.text === "" || !(len > 0)) return
       var cw = Math.min(vertical ? it.contentHeight : it.contentWidth, len)
