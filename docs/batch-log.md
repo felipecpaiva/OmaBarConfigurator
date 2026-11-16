@@ -136,3 +136,9 @@ Tests: presets 30/30, pill style 18/18, model 41/41, groups 15/15, group layout 
 spec, bar adapter, contract, no timers, qualified Color, private names, qmllint, scrub.
 
 Not checked yet: the live run on Felipe's bar (supervised, with a shell.json backup).
+
+Live check (2026-11-16, supervised; Felipe restarted the shell, applied Denial and pressed Undo
+from the Layout topic): `shell.json` was rewritten by the runs (modified 12:25:48, after the
+12:22 backup) and is **byte identical** to the backup afterwards (`cmp`). The undo record was
+cleared at 12:25:49, which the panel only does after verifying the live layout equals the
+snapshot. No OmaBar warnings in the journal. Batch 4 is done.
