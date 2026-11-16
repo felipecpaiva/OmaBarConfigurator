@@ -136,12 +136,17 @@ var ALIGN = { h: { end: 2, center: 4 }, v: { end: 64, center: 128 } }
 // binding re-run when any of them changes.
 function inkSpan(slot, vertical) {
   var lo = Infinity, hi = -Infinity
+  // Cross size of a tile that sets lo or hi (null for glyphs), so a pill can end on it evenly.
+  var loTile = null, hiTile = null
   var align = vertical ? ALIGN.v : ALIGN.h
   // [cl, ch]: the window a clipping ancestor leaves open; content outside it is not drawn.
   var cl = -Infinity, ch = Infinity
-  function add(a, b) {
+  function add(a, b, tile) {
     a = Math.max(a, cl); b = Math.min(b, ch)
-    if (b > a) { lo = Math.min(lo, a); hi = Math.max(hi, b) }
+    if (!(b > a)) return
+    var t = tile === undefined ? null : tile
+    if (a < lo || (a === lo && t !== null)) { lo = a; loTile = t }
+    if (b > hi || (b === hi && t !== null)) { hi = b; hiTile = t }
   }
   function walk(it, off, depth) {
     if (!it || it.visible === false || it.opacity === 0 || it.scale === 0 || depth > 48) return
@@ -179,19 +184,21 @@ function inkSpan(slot, vertical) {
     // A filled box smaller than the slot, such as the active workspace tile, is drawn content:
     // the pill must cover it. A box as wide as the slot is a hover fill or a frame and is skipped,
     // so hovering a widget never moves its pill.
-    if ("radius" in it && it.color && it.color.a > 0.02 && len > 0 && len < full - 1) add(pos, pos + len)
+    if ("radius" in it && it.color && it.color.a > 0.02 && len > 0 && len < full - 1) add(pos, pos + len, vertical ? it.width : it.height)
     var kids = it.children
     if (kids) for (var i = 0; i < kids.length; i++) walk(kids[i], pos, depth + 1)
   }
   var full = slot ? (vertical ? slot.height : slot.width) : 0
   var kids = slot ? slot.children : null
   if (kids) for (var i = 0; i < kids.length; i++) walk(kids[i], 0, 0)
-  return hi > lo ? { lo: lo, hi: hi } : null
+  return hi > lo ? { lo: lo, hi: hi, loTile: loTile, hiTile: hiTile } : null
 }
 
 // Slots of one area as fresh JS arrays, all in the coordinate space of the
 // area's pill parent: [{ id, start, end }] (center slots also carry part). Input for GroupLayout.pills.
-function areaSlots(located, area, vertical) {
+// cache: a Map from slot to its last measure. A slot is walked again only when its size
+// changes, so a widget animating its width costs one walk per frame, not the whole area's.
+function areaSlots(located, area, vertical, cache) {
   var out = []
   if (!located) return out
   var parent = located.parents[area]
@@ -202,8 +209,14 @@ function areaSlots(located, area, vertical) {
     for (var j = 0; j < slots.length; j++) {
       var start = offsetIn(slots[j], parent, vertical)
       var slot = { id: slotId(slots[j]), start: start, end: start + (vertical ? slots[j].height : slots[j].width) }
-      var ink = inkSpan(slots[j], vertical)
-      if (ink) { slot.inkStart = start + ink.lo; slot.inkEnd = start + ink.hi }
+      var w = slots[j].width, h = slots[j].height, c = cache ? cache.get(slots[j]) : null
+      var ink = c && c.w === w && c.h === h ? c.ink : inkSpan(slots[j], vertical)
+      if (cache && !(c && c.ink === ink)) cache.set(slots[j], { w: w, h: h, ink: ink })
+      if (ink) {
+        slot.inkStart = start + ink.lo; slot.inkEnd = start + ink.hi
+        if (ink.loTile !== null) slot.tileStart = ink.loTile
+        if (ink.hiTile !== null) slot.tileEnd = ink.hiTile
+      }
       if (area === "center") slot.part = String(lists[i].region) // centerBegin | center | centerEnd, for the centerParts rule
       out.push(slot)
     }

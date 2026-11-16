@@ -11,6 +11,14 @@ function run(left, breaks, opts, area) {
 var row = [S("a", 0, 10), S("b", 10, 20), S("c", 20, 30), S("d", 30, 40)]
 
 var tests = [
+  ["a pill ending on a box hugs it like its top and bottom", function () {
+    // across 20, box 16 tall: 2 px each side, so the pill end is 2 px past the box, not 12
+    var slots = { left: [{ id: "a", start: 0, end: 40, inkStart: 4, inkEnd: 36, tileStart: 16, tileEnd: 16 }] }
+    var p = G.pills(slots, {}, { padding: 12, gap: 4, even: false, across: 20 }).left
+    assert.deepStrictEqual([p[0].start, p[0].end], [2, 38])
+    var plain = G.pills(slots, {}, { padding: 12, gap: 4, even: false }).left
+    assert.deepStrictEqual([plain[0].start, plain[0].end], [-8, 48], "no across: plain padding")
+  }],
   ["OmaBar's own entry with a size is space between pills too", function () {
     var slots = { left: [S("a", 0, 10), S("io.github.felipecpaiva.omabarconfigurator", 10, 22), S("b", 22, 32)] }
     var p = G.pills(slots, { left: ["b"] }, { padding: 4, gap: 2, even: false }).left

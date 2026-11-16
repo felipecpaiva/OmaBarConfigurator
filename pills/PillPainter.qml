@@ -75,11 +75,13 @@ BarWidget {
   function pillsOf(area) {
     if (!located) return []
     var areas = {}
-    areas[area] = BarAdapter.areaSlots(located, area, vertical)
+    areas[area] = BarAdapter.areaSlots(located, area, vertical, inkCache)
     var parent = located.parents[area]
     var extent = parent ? (vertical ? parent.height : parent.width) : Infinity
+    // The pill's thickness, as PillShape draws it (cross size of the parent minus the inset twice).
+    var across = parent ? Math.max(0, Math.round((vertical ? parent.width : parent.height) - 2 * style.inset)) : 0
     var pills = GroupLayout.pills(areas, store.groups.breaks, {
-      padding: style.padding, gap: style.gap, min: style.inset, max: extent - style.inset, even: false, // an end with room keeps full padding (Felipe, 2026-11-16)
+      padding: style.padding, gap: style.gap, min: style.inset, max: extent - style.inset, even: false, across: across, // an end with room keeps full padding (Felipe, 2026-11-16)
       solo: store.groups.solo, noPill: store.groups.noPill, centerParts: store.groups.centerParts
     })[area]
     // Square edges: the outermost pill runs to the screen edge, in the parent's coordinates.
@@ -111,7 +113,12 @@ BarWidget {
     console.warn("OmaBar pills: " + message + "; drawing no pills")
   }
 
+  // Last ink measure per slot (BarAdapter.areaSlots); a Map is not watched, so filling it
+  // never re-runs a binding. Cleared when the bar is located again.
+  property var inkCache: new Map()
+
   function scan() {
+    inkCache = new Map()
     located = active ? BarAdapter.locate(root, warnOnce) : null
   }
 

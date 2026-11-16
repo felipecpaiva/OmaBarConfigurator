@@ -101,6 +101,17 @@ assert.deepStrictEqual(A.areaSlots(loc, "center", false), [
   { id: "omarchy.clock", start: 450, end: 510, part: "center" }
 ])
 assert.deepStrictEqual(A.areaSlots(loc, "right", false).map(function (s) { return [s.start, s.end] }), [[900, 940], [940, 970]])
+
+// The cache: a second pass with the same sizes gives the same slots from one measure per slot.
+;(function () {
+  var cache = new Map()
+  var first = JSON.stringify(A.areaSlots(loc, "center", false, cache))
+  var n = cache.size
+  assert.ok(n > 0, "measures are kept")
+  assert.strictEqual(JSON.stringify(A.areaSlots(loc, "center", false, cache)), first)
+  assert.strictEqual(cache.size, n, "nothing measured twice")
+  assert.strictEqual(JSON.stringify(A.areaSlots(loc, "center", false)), first, "same result without a cache")
+})()
 assert.deepStrictEqual(A.areaSlots(null, "left", false), [])
 
 // Vertical bar: the axis is y and height.
@@ -172,13 +183,13 @@ try {
   var hover = it({ x: 0, width: 100, color: "red", radius: 4 })
   var hidden = it({ x: 90, width: 10, text: "z", contentWidth: 10, visible: false })
   var slot = it({ width: 100 }, [hover, it({ x: 5 }, [text, img]), hidden])
-  assert.deepStrictEqual(A.inkSpan(slot, false), { lo: 20, hi: 70 })
+  assert.deepStrictEqual(A.inkSpan(slot, false), { lo: 20, hi: 70, loTile: null, hiTile: null })
   assert.strictEqual(A.inkSpan(it({ width: 10 }, [hover]), false), null)
   // A tile narrower than the slot counts; a transparent one does not.
   var tile = it({ x: 2, width: 90, color: { a: 0.3 }, radius: 4 })
-  assert.deepStrictEqual(A.inkSpan(it({ width: 100 }, [tile, text]), false), { lo: 2, hi: 92 })
+  assert.deepStrictEqual(A.inkSpan(it({ width: 100 }, [tile, text]), false), { lo: 2, hi: 92, loTile: 0, hiTile: 0 })
   var clear = it({ x: 2, width: 90, color: { a: 0 }, radius: 4 })
-  assert.deepStrictEqual(A.inkSpan(it({ width: 100 }, [clear, text]), false), { lo: 15, hi: 35 })
+  assert.deepStrictEqual(A.inkSpan(it({ width: 100 }, [clear, text]), false), { lo: 15, hi: 35, loTile: null, hiTile: null })
 })()
 
 console.log("OK bar-adapter")
