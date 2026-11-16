@@ -11,6 +11,11 @@ function run(left, breaks, opts, area) {
 var row = [S("a", 0, 10), S("b", 10, 20), S("c", 20, 30), S("d", 30, 40)]
 
 var tests = [
+  ["OmaBar's own entry with a size is space between pills too", function () {
+    var slots = { left: [S("a", 0, 10), S("io.github.felipecpaiva.omabarconfigurator", 10, 22), S("b", 22, 32)] }
+    var p = G.pills(slots, { left: ["b"] }, { padding: 4, gap: 2, even: false }).left
+    assert.deepStrictEqual(p.map(function (x) { return x.ids }), [["a"], ["b"]])
+  }],
   ["a spacer is space between pills, never part of one", function () {
     var slots = { left: [S("a", 0, 10), S("omarchy.spacer", 10, 22), S("b", 22, 32)] }
     var p = G.pills(slots, { left: ["b"] }, { padding: 4, gap: 2, even: false }).left

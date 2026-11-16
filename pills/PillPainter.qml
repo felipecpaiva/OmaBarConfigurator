@@ -15,9 +15,12 @@ import "../lib/PillStyle.js" as PillStyle
 BarWidget {
   id: root
 
-  visible: false
-  implicitWidth: 0
-  implicitHeight: 0
+  // shortcut: the entry's own `size` setting makes it a second spacer, because Omarchy's CLI adds only
+  // one omarchy.spacer per bar and the bar has no spacing option. Remove when Omarchy ships bar spacing.
+  readonly property int gapSize: Math.max(0, Math.min(64, Math.round(Number(root.settings && root.settings.size) || 0)))
+  visible: gapSize > 0
+  implicitWidth: vertical ? 0 : gapSize
+  implicitHeight: vertical ? gapSize : 0
 
   property string storeText: ""
   // shell.json, read only to know whether the bar is Solid (the plugin bar API has no glassy flag).

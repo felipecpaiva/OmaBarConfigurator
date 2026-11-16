@@ -987,6 +987,16 @@ Item {
     },
     // The stock indicators widget's own alwaysShow option: off, it shows its inactive
     // icons while the pointer is on the bar, which widens it and pushes the pills.
+    // OmaBar's own bar entry as a second spacer (interim: Omarchy has no bar spacing and adds
+    // one omarchy.spacer per bar). Sits wherever the entry is on the bar.
+    selfGap: {
+      get: function() { return Number(root.selfSetting("size")) || 0 },
+      set: function(value) {
+        if (root.busy) return
+        var n = Math.max(0, Math.min(64, Math.round(Number(value) || 0)))
+        runSequence([["omarchy-bar", "set", Model.SELF_ID, "size", String(n), "--json"]])
+      }
+    },
     indicatorsAlwaysShow: {
       get: function() { return root.indicatorsSetting("alwaysShow") === true },
       set: function(value) {
@@ -1002,6 +1012,18 @@ Item {
     var next = Model.toggleIndicator(root.indicatorsSetting("items"), String(id), on)
     if (!next) { root.layoutError = "At least one indicator must stay. To hide them all, hide Indicators in Widgets."; return }
     runSequence([["omarchy-bar", "set", "omarchy.indicators", "items", JSON.stringify(next), "--json"]])
+  }
+
+  // A key of OmaBar's own bar entry; undefined when it is not on the bar.
+  function selfSetting(key) {
+    var lay = root.liveLayout
+    for (var s in lay) {
+      var list = lay[s]
+      if (!list || typeof list.length !== "number") continue
+      for (var i = 0; i < list.length; i++)
+        if (list[i] && list[i].id === Model.SELF_ID) return list[i][key]
+    }
+    return undefined
   }
 
   // A key of the first omarchy.indicators entry on the bar; undefined when it is not on the bar.
