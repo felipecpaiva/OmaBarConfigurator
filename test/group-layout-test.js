@@ -144,7 +144,7 @@ tests.push(
   }],
   ["noPill keeps the gap rule between its neighbours", function () {
     var r = run(row, [], { padding: 12, gap: 8, noPill: ["b"] })
-    assert.deepStrictEqual([r[0].end, r[1].start], [11, 19]) // mid 15, centred gap
+    assert.deepStrictEqual([r[0].end, r[1].start], [6, 24]) // half a gap from the None slot (10-20)
   }],
   ["centerParts splits the center area into three", function () {
     var c = [P("a", "centerBegin", 0), P("b", "center", 10), P("c", "center", 20), P("d", "centerEnd", 30)]
@@ -171,6 +171,22 @@ tests.push(
     assert.deepStrictEqual(groupsOf(r), ["a", "b", "x", "c", "x"])
     r = run(c, [], withOpts({ solo: ["x"] }), "center")
     assert.deepStrictEqual(groupsOf(r), ["ab", "x", "c", "x", "e"])
+  }],
+  ["None widget: neighbour pills stop at it", function () {
+    var l = [S("a", 0, 100), S("ws", 100, 300), S("b", 300, 400)]
+    var o = function (gap) { return { padding: 12, gap: gap, noPill: ["ws"] } }
+    var r = run(l, [], o(0))
+    assert.deepStrictEqual(r.map(function (p) { return [p.start, p.end] }), [[-12, 100], [300, 412]])
+    r = run(l, [], o(8)) // half a gap of air on each side
+    assert.deepStrictEqual(r.map(function (p) { return [p.start, p.end] }), [[-12, 96], [304, 412]])
+    r = run(l.slice(0, 2), [], o(0)) // None at the area edge, one pill before
+    assert.deepStrictEqual(r.map(function (p) { return [p.start, p.end] }), [[-12, 100]])
+    r = run(l.slice(1), [], o(0)) // None at the area edge, one pill after
+    assert.deepStrictEqual(r.map(function (p) { return [p.start, p.end] }), [[300, 412]])
+  }],
+  ["None widget: a pill that would collapse keeps its slot bounds", function () {
+    var r = run([S("n", 0, 10), S("a", 10, 20)], [], { padding: 0, gap: 40, noPill: ["n"] })
+    assert.deepStrictEqual(r, [{ start: 10, end: 20, ids: ["a"] }])
   }],
   ["bad rule values never throw", function () {
     [null, 3, "s", {}, { length: "x" }, [1, null]].forEach(function (v) {

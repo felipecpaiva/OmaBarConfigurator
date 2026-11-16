@@ -102,9 +102,20 @@ BarWidget {
         if (made) have.push(made)
       }
     }
+    // Same count: match shapes by first widget id, so a pill whose members
+    // changed does not glide to another group. Only a clean match reorders.
+    var byKey = {}, ordered = []
+    for (var k = 0; k < have.length; k++) byKey[have[k].key] = have[k]
+    for (var m = 0; m < pills.length; m++) {
+      var hit = byKey[pills[m].ids[0]]
+      if (!hit) break
+      ordered.push(hit)
+      delete byKey[pills[m].ids[0]]
+    }
+    if (ordered.length === have.length) for (var o = 0; o < have.length; o++) have[o] = ordered[o]
     for (var j = 0; j < have.length; j++) {
-      have[j].start = pills[j].start
-      have[j].end = pills[j].end
+      have[j].key = pills[j].ids[0]
+      have[j].aim(pills[j].start, pills[j].end)
     }
   }
 

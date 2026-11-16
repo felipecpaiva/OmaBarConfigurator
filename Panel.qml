@@ -654,8 +654,10 @@ Item {
   function movePill(area, pillNumber, target) {
     if (root.busy || !root.storeLoaded || blockedByUnfinished()) return
     refreshLive()
+    var g = root.storeData.groups
+    var rows = Groups.rows(root.liveLayout, g.breaks, Model.SELF_ID, { solo: g.solo, noPill: g.noPill, centerParts: !!g.centerParts })
     var p = plan(function() {
-      return Presets.movePillPlan(root.liveLayout, root.storeData.groups.breaks, String(area), Number(pillNumber), String(target), root.layoutRoles())
+      return Presets.movePillPlan(root.liveLayout, g.breaks, String(area), Number(pillNumber), String(target), root.layoutRoles(), rows)
     })
     if (p.error) { root.layoutError = String(p.error); return }
     if (!p.argv || p.argv.length === 0) { root.layoutError = "Nothing to move: the pill is already there."; return }

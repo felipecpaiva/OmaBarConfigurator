@@ -11,20 +11,17 @@ var lay = { left: [{ id: "a" }, "b", { id: "c" }, { id: "d" }] }
 var tests = [
   ["empty layout", function () {
     assert.deepStrictEqual(Groups.rows({}, {}, SELF), { left: [], center: [], right: [] })
-    assert.deepStrictEqual(Groups.pillCount(Groups.rows({}, {}, SELF)), { left: 0, center: 0, right: 0 })
   }],
   ["one area, no breaks is one pill", function () {
     var r = Groups.rows(lay, {}, SELF)
     assert.deepStrictEqual(ids(r.left), ["a", "b", "c", "d"])
     assert.deepStrictEqual(pills(r.left), [1, 1, 1, 1])
     assert.deepStrictEqual(r.left.map(function (x) { return x.first }), [true, false, false, false])
-    assert.strictEqual(Groups.pillCount(r).left, 1)
   }],
   ["breaks split pills", function () {
     var r = Groups.rows(lay, { left: ["c", "d"] }, SELF)
     assert.deepStrictEqual(pills(r.left), [1, 1, 2, 3])
     assert.deepStrictEqual(r.left.map(function (x) { return x.startsPill }), [true, false, true, true])
-    assert.strictEqual(Groups.pillCount(r).left, 3)
   }],
   ["break on the first widget is not a split", function () {
     var r = Groups.rows(lay, { left: ["a"] }, SELF)
@@ -68,7 +65,7 @@ var tests = [
   }],
   ["garbage input never throws", function () {
     [null, undefined, 3, "s", [], { left: 5 }, { left: { length: "x" } }, { left: [null, undefined, {}, 7] }].forEach(function (g) {
-      Groups.rows(g, g, g); Groups.toggleBreak(g, g, g); Groups.pillCount(g)
+      Groups.rows(g, g, g); Groups.toggleBreak(g, g, g)
     })
     assert.deepStrictEqual(Groups.toggleBreak(null, "nope", "a"), { left: [], center: [], right: [] })
   }],
@@ -116,7 +113,6 @@ tests.push(
     assert.deepStrictEqual(r.left.map(function (x) { return x.mode }), ["shared", "solo", "shared", "none"])
     assert.deepStrictEqual(pills(r.left), [1, 2, 3, 0])
     assert.deepStrictEqual(r.left.map(function (x) { return x.startsPill }), [true, true, true, false])
-    assert.strictEqual(Groups.pillCount(r).left, 3)
   }],
   ["no rules means every row is shared", function () {
     Groups.rows(lay, {}, SELF).left.forEach(function (x) { assert.strictEqual(x.mode, "shared") })
@@ -127,6 +123,19 @@ tests.push(
     assert.deepStrictEqual(pills(r.left), [1, 0, 2])
     r = Groups.rows({ centerBegin: ["a"], center: ["b"], centerEnd: ["c"] }, {}, SELF, { centerParts: true })
     assert.deepStrictEqual(pills(r.center), [1, 2, 3])
+  }],
+  ["forced rows say which rule forces them", function () {
+    var f = function (r) { return r.map(function (x) { return x.forcedBy || "-" }) }
+    var r = Groups.rows({ left: ["a", "n", "b", "o", "c", "d"] }, { left: ["d"] }, SELF, { noPill: ["n"], solo: ["o"] })
+    assert.deepStrictEqual(f(r.left), ["-", "-", "none", "own", "own", "-"])
+    assert.deepStrictEqual(r.left.map(function (x) { return x.forced }), [false, false, true, true, true, false])
+    assert.deepStrictEqual(r.left.map(function (x) { return x.startsPill }), [true, false, true, true, true, true])
+    r = Groups.rows({ centerBegin: ["a"], center: ["b", "c"], centerEnd: ["d"] }, {}, SELF, { centerParts: true })
+    assert.deepStrictEqual(f(r.center), ["-", "centerPart", "-", "centerPart"])
+    r = Groups.rows({ left: ["o", "a"] }, {}, SELF, { solo: ["o"] })
+    assert.deepStrictEqual(f(r.left), ["-", "own"]) // first row is not forced
+    r = Groups.rows({ center: ["a", "b"] }, {}, SELF, { centerParts: true })
+    assert.deepStrictEqual(f(r.center), ["-", "-"])
   }],
   ["setMode moves ids between lists and keeps other keys", function () {
     var g = { breaks: { left: [] }, solo: ["a"], noPill: ["b"], centerParts: true }
@@ -175,7 +184,12 @@ tests.push(
       Object.keys(r).forEach(function (area) {
         var msg = JSON.stringify({ layout: layout, breaks: breaks, rules: rules, area: area })
         assert.deepStrictEqual(got[area].map(function (p) { return p.ids }), want[area], msg)
-        r[area].forEach(function (w) { assert.strictEqual(w.pill === 0, w.mode === "none", msg) })
+        r[area].forEach(function (w) {
+          assert.strictEqual(w.pill === 0, w.mode === "none", msg)
+          assert.strictEqual(w.forced, w.forcedBy !== "", msg)
+          if (w.forced) assert.strictEqual(w.startsPill, true, msg)
+          if (w.mode === "none") assert.strictEqual(w.forced, false, msg)
+        })
       })
     }
   }]

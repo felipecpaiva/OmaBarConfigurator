@@ -142,3 +142,28 @@ from the Layout topic): `shell.json` was rewritten by the runs (modified 12:25:4
 12:22 backup) and is **byte identical** to the backup afterwards (`cmp`). The undo record was
 cleared at 12:25:49, which the panel only does after verifying the live layout equals the
 snapshot. No OmaBar warnings in the journal. Batch 4 is done.
+
+## Batch 4.5: Grouped and Spread, group rules, smooth pills (2026-11-16)
+
+Five parallel streams (group rules logic, Grouped and Spread presets, Groups page controls,
+research on spacing and the Spaces widget, impasto animation study plus the pill glide), an
+independent review, then four parallel fixers.
+
+Review verdict was "adds options, does not yet give the look"; fixed: Move pill now uses the same
+pill numbers as the Groups page (rules aware, refuses on stale rows; 2000 seeded random layouts);
+Grouped gives three pills around the clock and keeps the clock alone in center; Spread keeps the
+old center groups apart; a None widget no longer has pill ends under it (pills stop half a gap
+from it); forced splits show a disabled switch with a reason; the hint suggests None for a
+workspaces switcher; pills only move on whole pixel changes, so ticking text does not run the
+animation; pills follow their group instead of their index.
+
+Applied for Felipe (with a backup): Spaces settings iconHighlight=dot, showApps=active,
+pillBackground=false, pillBorder=false, activeStyle=subtle. The active workspace keeps a full
+height tile (no setting removes it), so the look test uses OmaBar None on Spaces.
+
+Known debt: lib/Presets.js is 295 lines (cap 250); split into Presets.js and PresetTargets.js with
+a coordinated Panel change. Grouped, then Spread, then Grouped again carries breaks back and can
+give five center pills instead of three. Panel.qml is about 1700 lines (legacy v0.1 file).
+
+Tests: presets 47/47, group layout 33/33, groups 21/21, pill style, model, settings spec, bar
+adapter, contract, no timers, qualified Color, private names, qmllint, scrub.

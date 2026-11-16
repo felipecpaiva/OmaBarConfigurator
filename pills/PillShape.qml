@@ -34,6 +34,20 @@ Rectangle {
   property bool placed: false
   Component.onCompleted: Qt.callLater(() => pill.placed = true)
 
+  // Last whole-pixel edges asked for through aim(), and the first widget id.
+  // Reading start/end mid-glide gives the animated value, not the target.
+  property real aimStart: NaN
+  property real aimEnd: NaN
+  property string key: ""
+
+  // Sub-pixel changes draw the same pill, so they must not start the glide.
+  function aim(s, e) {
+    s = Math.round(s)
+    e = Math.round(e)
+    if (s !== aimStart) { aimStart = s; start = s }
+    if (e !== aimEnd) { aimEnd = e; end = e }
+  }
+
   readonly property real along: Math.max(0, Math.round(end) - Math.round(start))
   readonly property real across: Math.max(0, Math.round(cross - 2 * inset))
 

@@ -2,6 +2,7 @@
 var assert = require("assert")
 var P = require("../lib/Presets.js")
 var Groups = require("../lib/Groups.js")
+var GroupLayout = require("../lib/GroupLayout.js")
 var Model = require("../Model.js")
 
 var SELF = Model.SELF_ID
@@ -38,6 +39,19 @@ function real2() {
 }
 var ROLES = { workspaces: ["tornikegomareli.spaces"], selfId: SELF, centerAnchor: "" }
 var j = JSON.stringify
+var ANCHORED = { workspaces: ["tornikegomareli.spaces"], selfId: SELF, centerAnchor: "google-calendar.clock" }
+// Pills as the painter draws them: each widget 10 px wide, painter left out.
+function drawn(lay, breaks, rules) {
+  var areas = {}, x = 0, AR = { left: ["left"], center: ["centerBegin", "center", "centerEnd"], right: ["right"] }
+  Object.keys(AR).forEach(function (a) {
+    areas[a] = []
+    AR[a].forEach(function (s) { ids(lay[s]).forEach(function (id) { if (id !== SELF) { areas[a].push({ id: id, part: s, start: x, end: x + 10 }); x += 10 } }) })
+  })
+  var out = GroupLayout.pills(areas, breaks, rules || {})
+  Object.keys(out).forEach(function (a) { out[a] = out[a].map(function (p) { return p.ids }) })
+  return out
+}
+function movedIds(plan) { return plan.argv.map(function (a) { return a[2] }) }
 
 var tests = [
   ["SELF_ID mirrors Model.js", function () { assert.strictEqual(P.SELF_ID, Model.SELF_ID) }],
@@ -308,12 +322,14 @@ var tests = [
       assert.strictEqual(ids(out.center)[0], "google-calendar.clock")
     })
   }],
-  ["grouped and spread return breaks without widgets that changed area", function () {
+  ["grouped and spread carry the breaks of widgets that changed area, and split where groups meet", function () {
     var lay = real2(), brk = { left: ["tornikegomareli.spaces", "omarchy.menu"], center: ["omarchy.weather", "omarchy.indicators"], right: ["omarchy.audio", SELF] }
     // grouped moves left and right widgets into the center area; the painter stays in right
-    assert.deepStrictEqual(P.presetPlan(lay, "grouped", ROLES, brk).breaks, { left: [], center: ["omarchy.weather", "omarchy.indicators"], right: [SELF] })
+    assert.deepStrictEqual(P.presetPlan(lay, "grouped", ROLES, brk).breaks, { left: [], right: [SELF],
+      center: ["omarchy.weather", "omarchy.indicators", "tornikegomareli.spaces", "omarchy.menu", "omarchy.keyboard-layout", "omarchy.audio"] })
     // spread moves centerBegin/centerEnd widgets out of the center area
-    assert.deepStrictEqual(P.presetPlan(lay, "spread", ROLES, brk).breaks, { left: ["tornikegomareli.spaces", "omarchy.menu"], center: [], right: ["omarchy.audio", SELF] })
+    assert.deepStrictEqual(P.presetPlan(lay, "spread", ROLES, brk).breaks, { center: [],
+      left: ["tornikegomareli.spaces", "omarchy.menu", "omarchy.indicators"], right: ["omarchy.audio", SELF, "omarchy.weather", "omarchy.keyboard-layout"] })
     assert.deepStrictEqual(brk.left, ["tornikegomareli.spaces", "omarchy.menu"])
   }],
   ["unknown preset names and prototype keys are refused", function () {
@@ -323,12 +339,103 @@ var tests = [
     assert.deepStrictEqual(P.PRESETS.map(function (p) { return p.id }), ["denial", "grouped", "spread"])
     P.PRESETS.forEach(function (p) { assert.ok(p.label && p.help && !/[\u2013\u2014]/.test(p.label + p.help)) })
   }],
+  ["move pill with rows: numbers follow the Groups page (Own, None)", function () {
+    var lay = shaped({ left: ["ws", "A", "B", "C"], right: ["r"] }), brk = { left: ["C"] }, rules = { solo: ["ws"] }
+    var plan = P.movePillPlan(lay, brk, "left", 2, "right", ROLES, Groups.rows(lay, brk, SELF, rules))
+    assert.deepStrictEqual(movedIds(plan), ["A", "B"])
+    assert.deepStrictEqual(ids(P.applyMoves(lay, plan.argv).right), ["r", "A", "B"])
+    lay = shaped({ left: ["A", "N", "B"] }); rules = { noPill: ["N"] }
+    var rows = Groups.rows(lay, {}, SELF, rules)
+    assert.deepStrictEqual(movedIds(P.movePillPlan(lay, {}, "left", 2, "right", ROLES, rows)), ["B"])
+    assert.deepStrictEqual(movedIds(P.movePillPlan(lay, {}, "left", 1, "right", ROLES, rows)), ["A"])
+    assert.ok(P.movePillPlan(lay, {}, "left", 0, "right", ROLES, rows).error) // a None row is in no pill
+  }],
+  ["move pill with rows: the neighbours of a moved solo pill stay apart", function () {
+    var lay = shaped({ left: ["A", "S", "C"] }), rules = { solo: ["S"] }
+    var plan = P.movePillPlan(lay, {}, "left", 2, "right", ROLES, Groups.rows(lay, {}, SELF, rules))
+    assert.deepStrictEqual(movedIds(plan), ["S"])
+    assert.deepStrictEqual(plan.breaks.left, ["C"])
+    var after = Groups.rows(P.applyMoves(lay, plan.argv), plan.breaks, SELF, rules)
+    assert.deepStrictEqual(after.left.map(function (r) { return r.id + r.pill }), ["A1", "C2"])
+  }],
+  ["move pill with rows that do not match the bar is refused", function () {
+    var lay = shaped({ left: ["A", "B"] }), rows = Groups.rows(shaped({ left: ["B", "A"] }), {}, SELF)
+    assert.deepStrictEqual(P.movePillPlan(lay, {}, "left", 1, "right", ROLES, rows).argv, [])
+    assert.ok(P.movePillPlan(lay, {}, "left", 1, "right", ROLES, rows).error)
+    assert.ok(P.movePillPlan(lay, {}, "left", 1, "right", ROLES, { left: "x" }).error)
+  }],
+  ["move pill with rows moves exactly that pill (2000 seeded layouts and rules)", function () {
+    var seed = 99, rnd = function (n) { seed = (seed * 1103515245 + 12345) % 2147483648; return Math.floor(seed / 65536) % n }
+    var areas = ["left", "center", "right"], AR = { left: ["left"], center: ["centerBegin", "center", "centerEnd"], right: ["right"] }
+    var groupsOf = function (list) { // the remaining pills as lists of ids
+      var g = {}; list.forEach(function (r) { if (r.pill) (g[r.pill] = g[r.pill] || []).push(r.id) })
+      return Object.keys(g).map(function (k) { return g[k].join(",") })
+    }
+    for (var run = 0; run < 2000; run++) {
+      var lay = shaped({}), all = [], brk = { left: [], center: [], right: [] }, rules = { solo: [], noPill: [], centerParts: !!rnd(2) }
+      SEC.forEach(function (s) { for (var k = rnd(5); k > 0; k--) { var id = "w" + all.length; all.push(id); lay[s].push(rnd(3) ? id : { id: id }) } })
+      if (rnd(2)) lay[SEC[rnd(5)]].push({ id: SELF })
+      all.forEach(function (id) {
+        var k = rnd(6); if (k === 0) rules.solo.push(id); if (k === 1) rules.noPill.push(id)
+        if (rnd(3) === 0) areas.forEach(function (a) { brk[a].push(id) })
+      })
+      var rows = Groups.rows(lay, brk, SELF, rules), from = areas[rnd(3)], to = areas[(areas.indexOf(from) + 1 + rnd(2)) % 3]
+      var count = Math.max.apply(null, [0].concat(rows[from].map(function (r) { return r.pill }))); if (!count) continue
+      var n = 1 + rnd(count), want = rows[from].filter(function (r) { return r.pill === n }).map(function (r) { return r.id })
+      var plan = P.movePillPlan(lay, brk, from, n, to, ROLES, rows), ctx = j(lay) + j(brk) + j(rules) + " " + from + n + to
+      assert.strictEqual(plan.error, "", ctx)
+      assert.deepStrictEqual(movedIds(plan), want, ctx)
+      var out = P.applyMoves(lay, plan.argv), after = Groups.rows(out, plan.breaks, SELF, rules)
+      var srcIds = [].concat.apply([], AR[from].map(function (s) { return ids(out[s]) }))
+      assert.deepStrictEqual(srcIds, [].concat.apply([], AR[from].map(function (s) { return ids(lay[s]) })).filter(function (id) { return want.indexOf(id) < 0 }), ctx)
+      assert.deepStrictEqual(ids(out[AR[to][to === "center" ? 1 : 0]]).slice(-want.length), want, ctx)
+      // The other pills of the source area are unchanged, and the moved pill is one pill in the target.
+      assert.deepStrictEqual(groupsOf(after[from]), groupsOf(rows[from].filter(function (r) { return want.indexOf(r.id) < 0 })), ctx)
+      assert.ok(groupsOf(after[to]).indexOf(want.join(",")) >= 0, ctx + j(after[to]))
+    }
+  }],
+  ["Grouped on the real bar: three pills round the clock, no breaks needed before", function () {
+    var lay = real2(), plan = P.presetPlan(lay, "grouped", ROLES, {}), out = P.applyMoves(lay, plan.argv)
+    assert.strictEqual(plan.error, "")
+    assert.ok(plan.argv.every(function (a) { return a[2] !== SELF }))
+    assert.deepStrictEqual(plan.breaks.center, ["omarchy.indicators", "omarchy.keyboard-layout"])
+    assert.deepStrictEqual(drawn(out, plan.breaks), { left: [], right: [], center: [
+      ["omarchy.menu", "tornikegomareli.spaces"],
+      ["omarchy.indicators", "google-calendar.clock", "omarchy.weather", "io.github.jcarcinogen.gaming-console", "omarchy.system-update"],
+      ["omarchy.keyboard-layout", "felipe.tray", "io.github.felipecpaiva.omagnet", "omarchy.elsewhen", "esemczak.theme-modes", "omarchy.agents",
+        "omarchy.bluetooth", "omarchy.network", "omarchy.audio", "omarchy.monitor", "omarchy.power"]] })
+    // Spread then takes them back to the edges and keeps them apart.
+    var back = P.presetPlan(out, "spread", ROLES, plan.breaks), spread = P.applyMoves(out, back.argv)
+    assert.deepStrictEqual(drawn(spread, back.breaks), { center: [["google-calendar.clock"]],
+      left: [["omarchy.menu", "tornikegomareli.spaces"], ["omarchy.indicators"]],
+      right: [["omarchy.weather", "io.github.jcarcinogen.gaming-console", "omarchy.system-update"], ["omarchy.keyboard-layout", "felipe.tray",
+        "io.github.felipecpaiva.omagnet", "omarchy.elsewhen", "esemczak.theme-modes", "omarchy.agents", "omarchy.bluetooth", "omarchy.network",
+        "omarchy.audio", "omarchy.monitor", "omarchy.power"]] })
+  }],
+  ["Denial then Grouped keeps the clock alone in center", function () {
+    var lay = real2(), d = P.applyMoves(lay, P.presetPlan(lay, "denial", ANCHORED, {}).argv)
+    assert.deepStrictEqual(ids(d.center), ["tornikegomareli.spaces", "google-calendar.clock"])
+    ;[ANCHORED, ROLES].forEach(function (roles) { // with no anchor role, the only clock in center is the anchor
+      var g = P.presetPlan(d, "grouped", roles, {}), out = P.applyMoves(d, g.argv)
+      assert.deepStrictEqual(ids(out.center), ["google-calendar.clock"])
+      assert.deepStrictEqual(ids(out.centerBegin), ["tornikegomareli.spaces"])
+      assert.deepStrictEqual(drawn(out, g.breaks).center.length, 2)
+    })
+    var twoClocks = shaped({ center: ["a.clock", "x", "b.clock"] }) // no anchor can be found: center stays as is
+    assert.deepStrictEqual(P.presetPlan(twoClocks, "grouped", ROLES, {}).argv, [])
+  }],
+  ["Grouped then Spread then Undo is byte identical, anchored, painter never moved", function () {
+    var lay = real2(), g = P.presetPlan(lay, "grouped", ANCHORED, {}), a = P.applyMoves(lay, g.argv)
+    var s = P.presetPlan(a, "spread", ANCHORED, g.breaks), b = P.applyMoves(a, s.argv), u = P.undoPlan(b, lay)
+    assert.ok(g.argv.concat(s.argv, u.argv).every(function (x) { return x[2] !== SELF }))
+    assert.strictEqual(j(P.applyMoves(b, u.argv)), j(lay))
+  }],
   ["garbage never throws", function () {
     var junk = [undefined, null, 0, "x", [], {}, { left: "nope" }, { left: [null, 5, {}] }, [[1, 2]]]
     junk.forEach(function (a) {
       junk.forEach(function (b) {
         P.snapshot(a); P.applyMoves(a, b); P.presetPlan(a, "denial", b); P.presetPlan(a, b, b)
-        P.movePillPlan(a, b, "left", 1, "right", b); P.movePillPlan(a, b, b, b, b); P.undoPlan(a, b)
+        P.movePillPlan(a, b, "left", 1, "right", b, a); P.movePillPlan(a, b, "left", 1, "right", b, b); P.movePillPlan(a, b, b, b, b, b, b); P.undoPlan(a, b)
       })
     })
     P.applyMoves(shaped({ left: ["a"] }), [["omarchy-bar", "move", "a", "bogus"]])

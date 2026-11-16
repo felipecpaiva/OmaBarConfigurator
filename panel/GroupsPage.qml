@@ -69,7 +69,7 @@ Column {
     width: parent.width
     textFormat: Text.PlainText
     wrapMode: Text.WordWrap
-    text: "Own gives a widget a pill of its own, for example the workspaces. None draws no pill behind it, for widgets that paint their own background."
+    text: "Own gives a widget a pill of its own, and suits widgets with plain icons. None draws no pill behind it, and suits widgets that draw their own background, for example a workspaces switcher."
     color: page.dim
     font.family: page.fontFamily
     font.pixelSize: Style.font.caption
@@ -151,7 +151,7 @@ Column {
           spacing: Style.space(2)
 
           PillMoveRow {
-            visible: entry.modelData.startsPill
+            visible: entry.modelData.startsPill && entry.modelData.pill > 0
             width: parent.width
             panel: page.panel
             area: section.modelData.key

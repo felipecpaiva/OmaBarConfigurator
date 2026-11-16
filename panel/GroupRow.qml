@@ -20,7 +20,18 @@ Rectangle {
   readonly property bool showSwitch: band.shared && !band.row.first
   readonly property bool ready: !!band.panel && !band.panel.busy
 
-  height: Style.space(32) + (band.showSwitch ? Style.space(26) : 0)
+  readonly property bool forced: !!band.row.forced
+  readonly property var reasons: ({
+    none: "Starts a pill because the widget before it has no pill",
+    own: "Starts a pill because of Own",
+    centerPart: "Starts a pill because the center is split"
+  })
+  readonly property string switchText: band.forced ? (band.reasons[band.row.forcedBy] || "Starts a pill by a rule")
+    : (band.row.repeat ? "Same widget appears earlier; split there" : "New pill starts here")
+  // The switch band follows the switch's own height, so it never overhangs.
+  readonly property real bandHeight: band.showSwitch ? Math.max(startSwitch.implicitHeight, switchLabel.implicitHeight) + Style.space(4) : 0
+
+  height: Style.space(32) + band.bandHeight
   radius: Style.space(6)
   color: band.row.pill > 0 && band.row.pill % 2 === 0 && band.panel ? band.panel.selectedFill : "transparent"
 
@@ -95,13 +106,19 @@ Rectangle {
   }
 
   Text {
+    id: switchLabel
     visible: band.showSwitch
+    anchors.left: parent.left
+    anchors.leftMargin: Style.space(38)
     anchors.right: startSwitch.left
     anchors.rightMargin: Style.space(8)
-    y: Style.space(32) + (Style.space(26) - height) / 2
+    y: Style.space(32) + (band.bandHeight - height) / 2
+    horizontalAlignment: Text.AlignRight
     textFormat: Text.PlainText
-    text: band.row.repeat ? "Same widget appears earlier; split there" : "New pill starts here"
+    wrapMode: Text.WordWrap
+    text: band.switchText
     color: band.dim
+    opacity: band.forced ? 0.7 : 1
     font.family: band.fontFamily
     font.pixelSize: Style.font.caption
   }
@@ -111,8 +128,8 @@ Rectangle {
     visible: band.showSwitch
     anchors.right: parent.right
     anchors.rightMargin: Style.space(8)
-    y: Style.space(32) + (Style.space(26) - height) / 2
-    enabled: !band.row.repeat && band.ready
+    y: Style.space(32) + (band.bandHeight - height) / 2
+    enabled: !band.row.repeat && !band.forced && band.ready
     opacity: enabled ? 1 : 0.4
     checked: band.row.startsPill
     foreground: band.foreground
