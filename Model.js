@@ -11,6 +11,9 @@
 
 var REGIONS = ["left", "center", "right"]
 
+// The painter's own bar entry: hiding it would remove the pills, so the panel never lists it.
+var SELF_ID = "io.github.felipecpaiva.omabarconfigurator"
+
 // ---------------------------------------------------------------- host mirrors
 //
 // entryId / entrySettings / widgetKind / resolveCenterAnchor mirror the host's
@@ -117,7 +120,7 @@ function barCatalogue(shellConfig, savedHidden) {
     var entries = sectionEntries(shellConfig, REGIONS[r])
     for (var i = 0; i < entries.length; i++) {
       var id = entryId(entries[i])
-      if (!id) continue // an entry with no id draws nothing, so there is nothing to toggle
+      if (!id || id === SELF_ID) continue // an entry with no id draws nothing, so there is nothing to toggle
       seen[id] = true
       rows.push({
         id: id,
@@ -133,7 +136,7 @@ function barCatalogue(shellConfig, savedHidden) {
   for (var s = 0; s < saved.length; s++) {
     var record = saved[s]
     var savedId = isPlainObject(record) ? String(record.id || "") : String(record || "")
-    if (!savedId || seen[savedId]) continue
+    if (!savedId || savedId === SELF_ID || seen[savedId]) continue
     seen[savedId] = true
     rows.push({ id: savedId, region: null, index: null, visible: false, isAnchor: false })
   }

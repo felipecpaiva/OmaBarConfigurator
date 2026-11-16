@@ -13,7 +13,7 @@ var REQUIRED = {
   WidgetHost: { props: ["owner", "pool", "entry", "activeItem", "key"], ids: ["registryLoader"] },
   ModuleSlot: { props: ["region", "widgetKey", "entry", "moduleName", "activeItem", "host", "pool"], ids: ["holder"], readonlyAliases: ["widgetHolder"] },
   WidgetPool: { props: ["hosts", "slots"], ids: [] },
-  ModuleList: { props: ["region", "keys", "pool"], ids: [] }
+  ModuleList: { props: ["region", "keys", "pool", "listRows"], ids: [] }
 }
 
 // Body of `component Name: Type {` up to the closing brace at the same indent.

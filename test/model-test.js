@@ -120,6 +120,14 @@ test("barCatalogue rows every layout entry, in region order, marking the anchor"
   assert.ok(rows.every(function(r) { return r.visible }))
 })
 
+test("barCatalogue never lists the painter's own entry", function() {
+  var config = live()
+  config.bar.layout.right.push({ id: "io.github.felipecpaiva.omabarconfigurator" })
+  var rows = M.barCatalogue(config, ["io.github.felipecpaiva.omabarconfigurator"])
+  assert.strictEqual(rows.length, 15)
+  assert.ok(rows.every(function(r) { return r.id !== "io.github.felipecpaiva.omabarconfigurator" }))
+})
+
 test("barCatalogue appends hidden rows with region null", function() {
   var config = live()
   var saved = M.captureEntry(config, "omarchy.weather")

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Installs the Bar Configurator as a panel plugin and puts it in the
-# Applications list, so it never takes a slot on the bar. See README.md.
+# Installs OmaBar Configurator: the panel, in the Applications list, and one
+# invisible bar entry that draws the pills. See README.md.
 set -euo pipefail
 
 REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -15,12 +15,15 @@ shopt -s nullglob
 rm -rf "$PLUGIN_DEST"
 mkdir -p "$PLUGIN_DEST"
 cp -f "$REPO_DIR/manifest.json" "$REPO_DIR"/*.qml "$REPO_DIR"/*.js "$PLUGIN_DEST/"
+for dir in lib pills; do
+  cp -r "$REPO_DIR/$dir" "$PLUGIN_DEST/"
+done
 omarchy plugin validate "$PLUGIN_DEST"
 
 echo
 echo "== 2/3: enabling it =="
-# kinds is ["panel"], so enabling adds a plugins[] entry and never touches
-# bar.layout. omarchy-plugin-add's section prompt is bar-widget-only.
+# kinds include "bar-widget", so enabling puts one invisible "OmaBar pills"
+# entry on the bar. It takes no space and draws nothing until pills are on.
 omarchy-shell -q shell rescanPlugins >/dev/null
 for _ in {1..40}; do
   omarchy-plugin-list --json | jq -e --arg id "$PLUGIN_ID" 'any(.[]; .id == $id)' >/dev/null && break

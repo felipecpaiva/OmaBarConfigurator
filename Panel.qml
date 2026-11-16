@@ -7,6 +7,7 @@ import qs.Commons
 import qs.Commons as Commons
 import qs.Ui
 import "Model.js" as Model
+import "lib/PillStyle.js" as PillStyle
 
 // Bar widget picker: one row per widget on the bar, grouped by the section it
 // sits in, each with a switch for shown/hidden. A hidden widget keeps its row
@@ -434,20 +435,23 @@ Item {
     onLoadFailed: root.loadStore("")
   }
 
+  // Last raw store text: persistStore merges onto it so a hidden-list write
+  // never drops the style, the groups or any key a newer version added.
+  property string lastRawText: ""
+
   function loadStore(raw) {
-    var next = []
-    try {
-      var parsed = JSON.parse(String(raw || "") || "{}")
-      if (parsed && Array.isArray(parsed.hidden)) next = parsed.hidden
-    } catch (e) {
-      console.warn("oma-bar-configurator: hidden store unreadable, starting empty:", e)
-    }
-    root.savedHidden = next
+    root.lastRawText = String(raw || "")
+    var parsed = PillStyle.readStore(root.lastRawText)
+    for (var i = 0; i < parsed.warnings.length; i++)
+      console.warn("oma-bar-configurator:", parsed.warnings[i])
+    root.savedHidden = parsed.hidden
     root.storeLoaded = true
   }
 
   function persistStore() {
-    store.setText(JSON.stringify({ version: 1, hidden: root.savedHidden }, null, 2) + "\n")
+    var text = PillStyle.writeStore(root.lastRawText, { hidden: root.savedHidden })
+    root.lastRawText = text
+    store.setText(text)
   }
 
   // ---- live config -----------------------------------------------------

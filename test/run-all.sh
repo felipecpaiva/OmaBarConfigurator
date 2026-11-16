@@ -14,6 +14,22 @@ for t in test/*.js; do
   node "$t" || { echo "FAIL $t"; failed=1; }
 done
 
+step "no timers or polling in the painter"
+# Zero idle cost (docs/quality-bar.md, Cost): updates come only from bindings and signals.
+if hits=$(grep -rnE '\bTimer\b|setInterval' pills lib 2>/dev/null); then
+  echo "$hits"; echo "FAIL timers: Timer or setInterval found in pills/ or lib/"; failed=1
+else
+  echo "OK no timers"
+fi
+
+step "private bar names only in pills/BarAdapter.js"
+# The distinctive private names of the stock bar (docs/architecture.md section 6).
+if hits=$(grep -rnwE 'widgetKey|widgetHolder|listRows|owner' pills lib 2>/dev/null | grep -v '^pills/BarAdapter\.js:'); then
+  echo "$hits"; echo "FAIL private names: use them only in pills/BarAdapter.js"; failed=1
+else
+  echo "OK private names"
+fi
+
 step "qmllint"
 if [[ ! -x "$QMLLINT" ]]; then
   echo "SKIP qmllint"
