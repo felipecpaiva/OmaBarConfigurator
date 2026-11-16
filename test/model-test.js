@@ -110,6 +110,14 @@ function test(name, fn) { tests.push([name, fn]) }
 
 // ------------------------------------------------------------------ catalogue
 
+test("letters: initials, skip a leading Omarchy, one word keeps two letters", function() {
+  assert.strictEqual(M.letters("Omarchy Gaming Console"), "GC")
+  assert.strictEqual(M.letters("Theme modes"), "TM")
+  assert.strictEqual(M.letters("omagnet"), "Om")
+  assert.strictEqual(M.letters("Omarchy"), "Om")
+  assert.strictEqual(M.letters(""), "?")
+})
+
 test("barCatalogue rows every layout entry, in region order, marking the anchor", function() {
   var rows = M.barCatalogue(live(), [])
   assert.strictEqual(rows.length, 15)

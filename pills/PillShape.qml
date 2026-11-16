@@ -17,6 +17,9 @@ Rectangle {
   property real inset: 0
   // 999 or more means fully round ends.
   property real cornerRadius: 0
+  // Square the corners at the start (left or top) or the end (right or bottom), for a pill at the screen edge.
+  property bool squareStart: false
+  property bool squareEnd: false
   property color fillColor: "transparent"
   property real fillOpacity: 1
   property color edgeColor: "transparent"
@@ -56,6 +59,10 @@ Rectangle {
   width: vertical ? across : along
   height: vertical ? along : across
   radius: Math.min(cornerRadius, Math.min(width, height) / 2)
+  topLeftRadius: squareStart ? 0 : radius
+  topRightRadius: (vertical ? squareStart : squareEnd) ? 0 : radius
+  bottomLeftRadius: (vertical ? squareEnd : squareStart) ? 0 : radius
+  bottomRightRadius: squareEnd ? 0 : radius
   color: Qt.rgba(fillColor.r, fillColor.g, fillColor.b, fillOpacity)
   border.width: edgeWidth
   border.color: Qt.rgba(edgeColor.r, edgeColor.g, edgeColor.b, edgeOpacity)

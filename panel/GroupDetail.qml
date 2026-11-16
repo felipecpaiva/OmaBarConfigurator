@@ -23,7 +23,7 @@ Column {
   readonly property string rawGlyph: detail.row ? detail.panel.widgetGlyph(detail.row.id) : ""
   // A widget without its own glyph shows the first two letters of its name instead.
   readonly property bool lettered: !!detail.row && detail.rawGlyph === detail.panel.fallbackGlyph
-  readonly property string glyph: detail.lettered ? detail.name.slice(0, 2) : detail.rawGlyph
+  readonly property string glyph: detail.lettered && detail.panel ? detail.panel.widgetLetters(detail.row.id) : detail.rawGlyph
 
   spacing: Style.space(4)
 

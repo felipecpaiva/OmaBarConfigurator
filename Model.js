@@ -433,8 +433,19 @@ function nextAnchorAfterHiding(shellConfig, id) {
   return survivors[Math.floor(survivors.length / 2)]
 }
 
+// Two letters for a widget with no known glyph: initials of the first two words, skipping a
+// leading "Omarchy" ("Omarchy Gaming Console" -> "GC"); one word gives "Om" ("omagnet").
+function letters(name) {
+  var words = String(name || "").split(/[\s._-]+/).filter(function(w) { return w !== "" })
+  if (words.length > 1 && words[0].toLowerCase() === "omarchy") words.shift()
+  if (words.length === 0) return "?"
+  if (words.length === 1) return words[0].charAt(0).toUpperCase() + words[0].charAt(1).toLowerCase()
+  return (words[0].charAt(0) + words[1].charAt(0)).toUpperCase()
+}
+
 if (typeof module !== "undefined") {
   module.exports = {
+    letters: letters,
     barCatalogue: barCatalogue,
     captureEntry: captureEntry,
     hideArgv: hideArgv,

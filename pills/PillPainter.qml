@@ -113,7 +113,11 @@ BarWidget {
       delete byKey[pills[m].ids[0]]
     }
     if (ordered.length === have.length) for (var o = 0; o < have.length; o++) have[o] = ordered[o]
+    var square = style.squareEdges
     for (var j = 0; j < have.length; j++) {
+      // Only the outermost pills touch a screen edge: left's first, right's last.
+      have[j].squareStart = square && area === "left" && j === 0
+      have[j].squareEnd = square && area === "right" && j === have.length - 1
       have[j].key = pills[j].ids[0]
       have[j].aim(pills[j].start, pills[j].end)
     }
@@ -135,6 +139,7 @@ BarWidget {
   onCenterPillsChanged: syncArea("center", centerPills)
   onRightPillsChanged: syncArea("right", rightPills)
   onLookChanged: restyle()
+  onStyleChanged: { syncArea("left", leftPills); syncArea("right", rightPills) }
   Component.onCompleted: Qt.callLater(scan)
   Component.onDestruction: { clearArea("left"); clearArea("center"); clearArea("right") }
 

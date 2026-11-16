@@ -98,7 +98,7 @@ Item {
       anchors.centerIn: parent
       textFormat: Text.PlainText
       // A widget without its own glyph shows its first two letters instead.
-      text: chip.fallback ? chip.name.slice(0, 2) : (chip.panel ? chip.panel.widgetGlyph(chip.row.id) : "")
+      text: chip.fallback && chip.panel ? chip.panel.widgetLetters(chip.row.id) : (chip.panel ? chip.panel.widgetGlyph(chip.row.id) : "")
       color: chip.foreground
       font.family: chip.fallback || !chip.panel ? chip.fontFamily : chip.panel.widgetGlyphFamily(chip.row.id)
       font.pixelSize: chip.fallback ? Style.font.caption : Style.font.body

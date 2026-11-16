@@ -313,7 +313,13 @@ Item {
     "omarchy.agents": "󱚣",
     "omarchy.dropbox": "",
     "omarchy.notification-center": "󰂚",
-    "omarchy.notifications": "󰂚"
+    "omarchy.notifications": "󰂚",
+    // Plugin manifests carry no icon, so known third-party widgets are listed here.
+    "omarchy.elsewhen": "󱉊",
+    "io.github.jcarcinogen.gaming-console": "󰊗",
+    "io.github.felipecpaiva.omagnet": "󰍇",
+    "esemczak.theme-modes": "󰔎",
+    "tornikegomareli.spaces": "󰕰"
   })
 
   readonly property var glyphByCategory: ({
@@ -355,6 +361,7 @@ Item {
   }
   // A widget with only this glyph shows the first letters of its name instead.
   readonly property string fallbackGlyph: "󰐱"
+  function widgetLetters(id) { return Model.letters(widgetName(id)) }
 
   // The Omarchy mark is not in the icon font -- it is the "omarchy" family's
   // own private-use codepoint, drawn the way the bar's menu button draws it.
