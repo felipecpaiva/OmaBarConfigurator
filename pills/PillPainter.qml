@@ -46,9 +46,9 @@ BarWidget {
     // Style.cornerRadius mirrors Hyprland's decoration:rounding and refreshes on configreloaded (no Process or timer here).
     cornerRadius: style.radiusFollowsWindows ? Style.cornerRadius : style.radius,
     // The default fill on a Solid bar is the bar's own color, so the pill would vanish:
-    // tint it 10% toward the text color. A color the user picked is kept as is.
+    // tint the current theme's bar color 10% toward its text color. A color the user picked is kept as is.
     fillColor: style.color === "background" && PillStyle.solidBar(root.shellText)
-      ? Qt.tint(Commons.Color.background, Qt.rgba(Commons.Color.foreground.r, Commons.Color.foreground.g, Commons.Color.foreground.b, 0.10))
+      ? Qt.tint(root.bar && root.bar.background ? root.bar.background : Commons.Color.background, Qt.rgba(Commons.Color.foreground.r, Commons.Color.foreground.g, Commons.Color.foreground.b, 0.10))
       : PillStyle.resolveColor(style.color, themeColors, themeColors.background),
     fillOpacity: style.fillOpacity,
     edgeColor: PillStyle.resolveColor(style.borderColor, themeColors, themeColors.foreground),
