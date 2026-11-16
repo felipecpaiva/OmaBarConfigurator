@@ -23,7 +23,7 @@ Rectangle {
   readonly property bool forced: !!band.row.forced
   readonly property var reasons: ({
     none: "Starts a pill because the widget before it has no pill",
-    own: "Starts a pill because of Own",
+    own: "Starts a pill because the widget before it is Own",
     centerPart: "Starts a pill because the center is split"
   })
   readonly property string switchText: band.forced ? (band.reasons[band.row.forcedBy] || "Starts a pill by a rule")
