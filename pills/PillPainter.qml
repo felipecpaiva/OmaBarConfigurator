@@ -39,6 +39,7 @@ BarWidget {
   })
   readonly property var look: ({
     vertical: root.vertical,
+    animate: style.animate,
     inset: style.inset,
     // Style.cornerRadius mirrors Hyprland's decoration:rounding and refreshes on configreloaded (no Process or timer here).
     cornerRadius: style.radiusFollowsWindows ? Style.cornerRadius : style.radius,

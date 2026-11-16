@@ -1,4 +1,5 @@
 import QtQuick
+import qs.Commons
 
 // One pill behind a group of bar widgets. Drawing only: PillPainter decides
 // where it goes and how it looks. Edges sit on whole pixels.
@@ -25,6 +26,13 @@ Rectangle {
   // Style.easeOut, so `omarchy toggle animations` turns it off.
   property int fadeDuration: 0
   property var fadeCurve: [0, 0, 1, 1, 1, 1]
+  // Glide edges and color to new values instead of jumping. The widgets
+  // themselves move at once, so the pill trails them for a moment.
+  property bool animate: true
+  // False until the painter's first start and end are in, so a new pill
+  // appears at its place instead of growing out of x = 0.
+  property bool placed: false
+  Component.onCompleted: Qt.callLater(() => pill.placed = true)
 
   readonly property real along: Math.max(0, Math.round(end) - Math.round(start))
   readonly property real across: Math.max(0, Math.round(cross - 2 * inset))
@@ -40,8 +48,19 @@ Rectangle {
   // Behind the widgets of every section.
   z: -1
 
-  // Theme switches fade like the stock bar background; geometry never
-  // animates, so a pill never trails its widgets.
+  // One animation per edge, never on x and width: those are derived, so both
+  // edges land together and stay on whole pixels every frame.
+  // 160 ms strong ease out: most of the distance in the first frames, so the
+  // trail behind the widgets is short (docs/research/impasto-animations.md).
+  Behavior on start {
+    enabled: pill.animate && pill.placed
+    NumberAnimation { duration: Style.duration(160); easing.type: Easing.BezierSpline; easing.bezierCurve: Style.easeOut }
+  }
+  Behavior on end {
+    enabled: pill.animate && pill.placed
+    NumberAnimation { duration: Style.duration(160); easing.type: Easing.BezierSpline; easing.bezierCurve: Style.easeOut }
+  }
+  // Theme switches fade like the stock bar background.
   Behavior on color {
     ColorAnimation { duration: pill.fadeDuration; easing.type: Easing.BezierSpline; easing.bezierCurve: pill.fadeCurve }
   }
