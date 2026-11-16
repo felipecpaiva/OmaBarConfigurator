@@ -128,3 +128,11 @@ Before release, a visual pass judged on screenshots against Denial, Islands Bar 
    defines every setting with its topic, subgroup, help and advanced flag; the panel shows one
    topic at a time (Widgets, Pills, Groups, Bar) and a new topic needs no panel code. Defaults stay
    in `lib/PillStyle.js` only.
+
+7. (2026-11-16) Bar height and icon size stay outside OmaBar: they live in the theme's
+   `shell.toml` (`[bar] size-horizontal`, `icon-size`), a file OmaBar does not edit. Documented as a
+   tip only (docs/research/spacing-and-workspaces.md, section 3).
+8. (2026-11-16) Felipe's Spaces widget now uses `iconHighlight=dot`, `showApps=active`,
+   `pillBackground=false`, `pillBorder=false`, `activeStyle=subtle` (applied with `omarchy bar set`,
+   booleans with `--json`). The active workspace keeps a full height tile (`activeStyle` has no off
+   value), so the next look test tries OmaBar's "None" pill mode on Spaces.
