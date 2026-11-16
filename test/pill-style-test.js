@@ -14,6 +14,36 @@ test("solidBar reads bar.background, old configs and bad text", function() {
   assert.strictEqual(P.solidBar(""), false)
 })
 
+test("saved layouts: clean drops bad entries and caps the list", function() {
+  var list = P.cleanSaved([{ id: "1", name: "A", layout: {} }, { id: "", layout: {} }, { id: "2" }, "x",
+                           { id: "3", layout: {}, background: "weird", style: 5 }])
+  assert.deepStrictEqual(list.map(function (e) { return e.id }), ["1", "3"])
+  assert.strictEqual(list[1].background, "")
+  assert.deepStrictEqual(list[1].style, {})
+  var many = []; for (var i = 0; i < 15; i++) many.push({ id: "k" + i, layout: {} })
+  assert.strictEqual(P.cleanSaved(many).length, P.MAX_SAVED)
+  assert.deepStrictEqual(P.readStore("{}").saved, [])
+})
+
+test("saved layouts: names count past the highest, makeSaved keeps raw style and groups", function() {
+  assert.strictEqual(P.nextSavedName([]), "Layout 1")
+  assert.strictEqual(P.nextSavedName([{ name: "Layout 3" }, { name: "Mine" }]), "Layout 4")
+  var now = new Date("2026-11-16T18:00:00Z")
+  var e = P.makeSaved('{"style":{"gap":6},"groups":{"solo":["a"]}}', { left: ["a"] }, "none", now, [])
+  assert.deepStrictEqual([e.name, e.style, e.groups, e.background, e.at], ["Layout 1", { gap: 6 }, { solo: ["a"] }, "none", now.toISOString()])
+  var full = []; for (var i = 0; i < P.MAX_SAVED; i++) full.push({ name: "x" })
+  assert.strictEqual(P.makeSaved("{}", {}, "none", now, full), null)
+  var text = P.writeStore("{}", { saved: [e] })
+  assert.strictEqual(P.readStore(text).saved[0].name, "Layout 1")
+})
+
+test("undo keeps optional groups, style and background", function() {
+  var u = P.readStore('{"undo":{"layout":{},"groups":{"solo":[]},"style":{"gap":2},"background":"glassy"}}').undo
+  assert.deepStrictEqual([u.groups, u.style, u.background], [{ solo: [] }, { gap: 2 }, "glassy"])
+  var plain = P.readStore('{"undo":{"layout":{}}}').undo
+  assert.deepStrictEqual([plain.groups, plain.style, plain.background], [null, null, ""])
+})
+
 test("defaults for empty input", function() {
   var n = P.normalize(undefined)
   assert.deepStrictEqual(n.style, P.DEFAULTS)

@@ -800,6 +800,54 @@ Item {
     runPlanned(p)
   }
 
+  // ---- saved layouts (store helpers in lib/PillStyle.js) ----------------
+  readonly property var savedLayouts: root.storeData.saved
+
+  // One raw section of the store file, so a save keeps defaults as defaults.
+  function rawStoreSection(key) {
+    try { var o = JSON.parse(root.lastRawText || "{}"); return o && typeof o[key] === "object" && o[key] ? o[key] : {} }
+    catch (e) { return {} }
+  }
+
+  function saveCurrentLayout() {
+    if (root.busy || !root.storeLoaded) return
+    refreshLive()
+    var e = PillStyle.makeSaved(root.lastRawText, Presets.snapshot(root.liveLayout), root.barBackground, new Date(), root.savedLayouts)
+    if (!e) { root.layoutError = "You have " + PillStyle.MAX_SAVED + " saved layouts. Delete one first."; return }
+    root.layoutError = ""
+    persistPatch({ saved: root.savedLayouts.concat([e]) })
+  }
+
+  function deleteSavedLayout(id) {
+    if (root.busy) return
+    persistPatch({ saved: root.savedLayouts.filter(function(e) { return e.id !== String(id) }) })
+  }
+
+  // Bar layout, background, groups and style back to the saved entry. Undo first
+  // records all four, so Undo puts the bar back as it was before the apply.
+  function applySavedLayout(id) {
+    if (root.busy || !root.storeLoaded || blockedByUnfinished()) return
+    var e = null
+    for (var i = 0; i < root.savedLayouts.length; i++) if (root.savedLayouts[i].id === String(id)) e = root.savedLayouts[i]
+    if (!e) return
+    refreshLive()
+    var p = plan(function() { return Presets.undoPlan(root.liveLayout, e.layout) })
+    if (p.error) { root.layoutError = String(p.error); return }
+    var argv = p.argv.slice()
+    if (e.background !== "" && e.background !== root.barBackground) argv.push(["omarchy-bar", "background", e.background])
+    var groups = root.rawStoreSection("groups"), style = root.rawStoreSection("style")
+    if (argv.length === 0 && JSON.stringify(groups) === JSON.stringify(e.groups) && JSON.stringify(style) === JSON.stringify(e.style)) {
+      root.layoutError = "Nothing to change: the bar already looks like " + e.name + "."
+      return
+    }
+    persistPatch({ undo: { layout: Presets.snapshot(root.liveLayout), breaks: root.storeData.groups.breaks,
+                           label: e.name, at: new Date().toISOString(), running: argv.length > 0,
+                           groups: groups, style: style, background: root.barBackground } })
+    runLayout(argv, e.layout, function(text) {
+      return PillStyle.writeStore(text, { groups: e.groups, style: e.style })
+    }, "The bar did not end up as saved. Use Undo to go back.")
+  }
+
   // The record is cleared only once the bar is back at the saved layout.
   function undoLayout() {
     if (root.busy || !root.storeLoaded || !root.canUndo) return
@@ -807,10 +855,16 @@ Item {
     var undo = root.storeData.undo
     var p = plan(function() { return Presets.undoPlan(root.liveLayout, undo.layout) })
     if (p.error) { root.layoutError = String(p.error); return }
-    if (p.argv.length > 0)
-      persistPatch({ undo: { layout: undo.layout, breaks: undo.breaks, label: undo.label, at: undo.at, running: true } })
-    runLayout(p.argv, undo.layout, function(text) {
-      return root.writeBreaksText(PillStyle.writeStore(text, { undo: null }), undo.breaks)
+    var argv = p.argv.slice()
+    if (undo.background !== "" && undo.background !== root.barBackground) argv.push(["omarchy-bar", "background", undo.background])
+    if (argv.length > 0)
+      persistPatch({ undo: { layout: undo.layout, breaks: undo.breaks, label: undo.label, at: undo.at, running: true,
+                             groups: undo.groups, style: undo.style, background: undo.background } })
+    runLayout(argv, undo.layout, function(text) {
+      text = PillStyle.writeStore(text, { undo: null })
+      // After a saved layout: whole groups and style back; otherwise breaks only, as before.
+      if (undo.groups || undo.style) return PillStyle.writeStore(text, { groups: undo.groups || undefined, style: undo.style || undefined })
+      return root.writeBreaksText(text, undo.breaks)
     }, "Undo did not reach the saved layout. Try Undo again.")
   }
 

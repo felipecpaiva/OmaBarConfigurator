@@ -4,7 +4,7 @@ import qs.Commons as Commons
 import qs.Ui
 import "../lib/Presets.js" as Presets
 
-// Layout page: one card per preset, then the one Undo. Every action goes
+// Layout page: one card per preset, saved layouts, then the one Undo. Every action goes
 // through the Panel root (applyPreset, undoLayout); logic lives in lib/Presets.js.
 Column {
   id: page
@@ -22,7 +22,7 @@ Column {
     ? Qt.formatDateTime(new Date(panel.undoAt), "d MMM, hh:mm") : ""
   readonly property string undoText: page.canUndo
     ? panel.undoLabel + (page.undoWhen !== "" ? ", " + page.undoWhen : "")
-    : "Nothing to undo yet. Applying a preset or moving a pill makes Undo available."
+    : "Nothing to undo yet. Applying a preset, a saved layout or moving a pill makes Undo available."
 
   width: parent ? parent.width : 0
   spacing: Style.space(6)
@@ -101,6 +101,61 @@ Column {
         opacity: enabled ? 1 : 0.4
         onClicked: page.panel.applyPreset(card.modelData.id)
       }
+    }
+  }
+
+  PanelSectionHeader {
+    text: "SAVED LAYOUTS"
+    topPadding: Math.ceil(fontSize * 0.15) + Style.space(8)
+    foreground: page.foreground
+    fontFamily: page.fontFamily
+  }
+
+  Item {
+    width: parent.width
+    height: Math.max(saveLine.implicitHeight, saveButton.implicitHeight)
+
+    Text {
+      id: saveLine
+      anchors.left: parent.left
+      anchors.right: saveButton.left
+      anchors.rightMargin: Style.space(10)
+      anchors.verticalCenter: parent.verticalCenter
+      textFormat: Text.PlainText
+      wrapMode: Text.WordWrap
+      text: "Save the bar as it is now, then experiment. Apply brings it all back: widgets, pills and their look."
+      color: page.dim
+      font.family: page.fontFamily
+      font.pixelSize: Style.font.caption
+    }
+
+    Button {
+      id: saveButton
+      anchors.right: parent.right
+      anchors.verticalCenter: parent.verticalCenter
+      text: "Save current"
+      tooltipText: "Save the widgets, pills and their look as they are now"
+      fontSize: Style.font.bodySmall
+      fontFamily: page.fontFamily
+      foreground: page.foreground
+      bordered: true
+      enabled: !page.busy
+      opacity: enabled ? 1 : 0.4
+      onClicked: page.panel.saveCurrentLayout()
+    }
+  }
+
+  Repeater {
+    model: page.panel ? page.panel.savedLayouts : []
+
+    SavedLayoutRow {
+      required property var modelData
+      width: page.width
+      panel: page.panel
+      entry: modelData
+      foreground: page.foreground
+      dim: page.dim
+      fontFamily: page.fontFamily
     }
   }
 
