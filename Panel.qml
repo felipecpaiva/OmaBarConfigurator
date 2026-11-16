@@ -393,9 +393,9 @@ Item {
   signal toggleStarting()
 
   function open(payloadJson) {
-    // No payload keys are defined yet; parse anyway so a caller passing one
-    // cannot throw its way past the rest of this function.
-    try { JSON.parse(payloadJson || "{}") } catch (e) {}
+    // Payload key `topic` opens on that topic id (for example "groups"); unknown ids are ignored.
+    var payload = {}
+    try { payload = JSON.parse(payloadJson || "{}") || {} } catch (e) {}
     root.layoutError = ""
     checkUnfinished()
     store.reload()
@@ -407,6 +407,8 @@ Item {
     root.widgetKeepY = 0
     root.groupCursorAt = -1
     root.groupSelected = null
+    for (var i = 0; i < root.categories.length; i++)
+      if (root.categories[i].id === payload.topic) root.categoryId = String(payload.topic)
     root.opened = true
     setCenterHoverRevealSuppressed(true)
     // The surface is not mapped yet when open() runs, so a `focus: true`
