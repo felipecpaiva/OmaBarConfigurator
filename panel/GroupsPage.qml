@@ -3,6 +3,7 @@ import qs.Commons
 import qs.Commons as Commons
 import qs.Ui
 import "../lib/Groups.js" as Groups
+import "../Model.js" as Model
 
 // Groups page: per area, the widgets in bar order, the pill each one sits in,
 // and a switch to start a new pill at that widget. Logic lives in lib/Groups.js.
@@ -15,8 +16,7 @@ Column {
 
   readonly property var breaks: panel && panel.storeData && panel.storeData.groups ? panel.storeData.groups.breaks : null
   readonly property bool pillsOn: !!(panel && panel.storeData && panel.storeData.style && panel.storeData.style.enabled)
-  // The painter's own invisible entry (Model.js SELF_ID, not exported there).
-  readonly property string selfId: "io.github.felipecpaiva.omabarconfigurator"
+  readonly property string selfId: Model.SELF_ID
   readonly property var areaRows: Groups.rows(panel ? panel.liveLayout : null, breaks, page.selfId)
   readonly property var areas: [
     { key: "left", title: "LEFT" },
@@ -46,6 +46,16 @@ Column {
     textFormat: Text.PlainText
     wrapMode: Text.WordWrap
     text: "By default each section is one pill. Split it where you want."
+    color: page.dim
+    font.family: page.fontFamily
+    font.pixelSize: Style.font.caption
+  }
+
+  Text {
+    width: parent.width
+    textFormat: Text.PlainText
+    wrapMode: Text.WordWrap
+    text: "A widget that is hidden on the bar cannot start a pill."
     color: page.dim
     font.family: page.fontFamily
     font.pixelSize: Style.font.caption
@@ -117,7 +127,7 @@ Column {
           Text {
             anchors.left: glyph.right
             anchors.leftMargin: Style.space(8)
-            anchors.right: label.left
+            anchors.right: band.modelData.first ? parent.right : label.left
             anchors.rightMargin: Style.space(8)
             anchors.verticalCenter: parent.verticalCenter
             textFormat: Text.PlainText
@@ -135,7 +145,7 @@ Column {
             anchors.rightMargin: Style.space(8)
             anchors.verticalCenter: parent.verticalCenter
             textFormat: Text.PlainText
-            text: "New pill starts here"
+            text: band.modelData.repeat ? "Same widget appears earlier; split there" : "New pill starts here"
             color: page.dim
             font.family: page.fontFamily
             font.pixelSize: Style.font.caption
@@ -147,10 +157,11 @@ Column {
             anchors.right: parent.right
             anchors.rightMargin: Style.space(8)
             anchors.verticalCenter: parent.verticalCenter
+            enabled: !band.modelData.repeat
+            opacity: enabled ? 1 : 0.4
             checked: band.modelData.startsPill
             foreground: page.foreground
-            onToggled: page.panel.writeBreaks(section.modelData.key,
-              Groups.toggleBreak(page.breaks, section.modelData.key, band.modelData.id)[section.modelData.key])
+            onToggled: page.panel.toggleBreak(section.modelData.key, band.modelData.id)
           }
         }
       }

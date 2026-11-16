@@ -74,20 +74,27 @@ Three owners. Each file has exactly one.
 
 ```
 manifest.json            kinds: ["panel", "bar-widget"]; panel + barWidget entry points
-Panel.qml                (exists) panel shell and widget list; gains one tab host and a
-                         store writer that keeps keys it does not own. Its widget list never
-                         offers to hide the painter entry.
-Model.js                 (exists) pure: layout reading, hide and show argv
-panel/StylePage.qml      new: the Style tab (UI only, no logic)
-panel/GroupsPage.qml     new: break toggles and move-pill controls (UI only)
-panel/PresetsPage.qml    new: the Presets tab (UI only, no logic)
-lib/PillStyle.js         new, pure: defaults, schema version, normalize, color resolution
-lib/GroupLayout.js       new, pure: slots per section + breaks -> pill bounds
-lib/Presets.js           new, pure: presets AND move-pill argv, layout snapshot for Undo
-pills/PillPainter.qml    new: the bar widget; thin wiring of the parts below
-pills/BarAdapter.js      new: the ONLY file with private bar names; finds the bar surface
-                         and all ModuleLists
-pills/PillShape.qml      new: one Rectangle, drawing only
+settings/spec.json       every setting, grouped by topic (Widgets, Pills, Groups, Bar) with
+                         subgroup, label, help and advanced flag; holds NO default values
+Panel.qml                panel shell: topic switcher, the Widgets page (v0.1 list), store
+                         reader and writer, the CLI runner, and the API the pages call
+                         (settingValue, setSetting, writeStyle, writeBreaks, toggleBreak)
+Model.js                 pure: layout reading, hide and show argv; never lists SELF_ID
+panel/SettingsPage.qml   renders any spec topic: subgroup headers, Show advanced
+panel/SettingRow.qml     one setting row: label, help, control by type
+panel/GroupsPage.qml     Left, Center, Right lists with "New pill starts here" switches
+panel/PresetsPage.qml    batch 4: presets and move pill (UI only)
+lib/PillStyle.js         pure: DEFAULTS and LIMITS (the one place), normalize, colors,
+                         store read, write and patch
+lib/SettingsSpec.js      pure: spec validation against DEFAULTS and LIMITS, row state
+lib/Groups.js            pure: rows and break toggling for the Groups page; agrees with
+                         GroupLayout (tested)
+lib/GroupLayout.js       pure: slots per area + breaks -> pill bounds
+lib/Presets.js           batch 4, pure: presets AND move-pill argv, layout snapshot for Undo
+pills/PillPainter.qml    the bar widget; thin wiring of the parts below
+pills/BarAdapter.js      the ONLY file with private bar names; finds the bar surface and all
+                         ModuleLists
+pills/PillShape.qml      one Rectangle, drawing only
 test/*.js                node tests for every pure file, plus the adapter contract check
 ```
 

@@ -444,6 +444,7 @@ if (typeof module !== "undefined") {
     isCenterAnchor: isCenterAnchor,
     nextAnchorAfterHiding: nextAnchorAfterHiding,
     // exported for the tests and for Panel.qml's own row rendering
+    SELF_ID: SELF_ID,
     entryId: entryId,
     entrySettings: entrySettings,
     widgetKind: widgetKind

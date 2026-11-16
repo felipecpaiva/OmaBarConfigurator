@@ -101,6 +101,24 @@ test("writeStore survives broken previous text and bad patch", function() {
   assert.deepStrictEqual(JSON.parse(P.writeStore("{oops", { hidden: [] })), { hidden: [], version: 2 })
   assert.deepStrictEqual(JSON.parse(P.writeStore("", null)), { version: 2 })
 })
+test("patchStore keeps unknown style and groups keys, writes no defaults", function() {
+  var prev = JSON.stringify({ style: { gap: 3, future: 1 }, groups: { breaks: { left: ["a"] }, mode: "x" }, hidden: ["h"] })
+  var o = JSON.parse(P.patchStore(prev, "style", { enabled: true }))
+  assert.deepStrictEqual(o.style, { gap: 3, future: 1, enabled: true })
+  assert.deepStrictEqual(o.hidden, ["h"])
+  assert.strictEqual(o.version, 2)
+  o = JSON.parse(P.patchStore(prev, "groups", { breaks: { right: ["b"] } }))
+  assert.deepStrictEqual(o.groups, { breaks: { left: ["a"], right: ["b"] }, mode: "x" })
+  assert.deepStrictEqual(JSON.parse(P.patchStore("", "style", { gap: 2 })).style, { gap: 2 })
+})
+test("patchStore round trip with hidden", function() {
+  var t = P.writeStore("", { hidden: [{ id: "h" }] })
+  t = P.patchStore(t, "style", { enabled: true })
+  var r = P.readStore(t)
+  assert.deepStrictEqual(r.hidden, [{ id: "h" }])
+  assert.strictEqual(r.style.enabled, true)
+  assert.strictEqual(r.style.gap, 8)
+})
 
 var failed = 0
 tests.forEach(function(p) {

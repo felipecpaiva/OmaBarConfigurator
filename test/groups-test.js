@@ -38,6 +38,10 @@ var tests = [
     assert.deepStrictEqual(pills(r.left), [1, 1, 2, 2, 2])
     assert.deepStrictEqual(r.left.map(function (x) { return x.startsPill }), [true, false, true, false, false])
   }],
+  ["later copies of an id are marked repeat", function () {
+    var r = Groups.rows({ left: ["a", "x", "b", "x"] }, { left: ["x"] }, SELF)
+    assert.deepStrictEqual(r.left.map(function (w) { return w.repeat }), [false, false, false, true])
+  }],
   ["selfId and tray are skipped", function () {
     var r = Groups.rows({ left: [SELF, "a", "b"], tray: ["t"] }, { left: [SELF] }, SELF)
     assert.deepStrictEqual(ids(r.left), ["a", "b"])

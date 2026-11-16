@@ -68,8 +68,9 @@ function surface(drop, vertical) {
 
 function warnings() {
   var w = []
-  var f = function (m) { w.push(m) }
+  var f = function (m, soft) { w.push(m); f.soft.push(soft === true) }
   f.list = w
+  f.soft = []
   return f
 }
 
@@ -131,6 +132,8 @@ var oddAreas = A.findAreas(odd, w3)
 assert.strictEqual(w3.list.length, 1)
 assert.strictEqual(oddAreas.left.length, 1)
 assert.ok(w3.list[0].indexOf("leftish") >= 0)
+assert.deepStrictEqual(w3.soft, [true]) // soft: must not use the failure flag
+assert.strictEqual(w2.soft[0], false)
 
 // A widget waiting in the pool (no slot) still locates its surface.
 var pooled = surface()

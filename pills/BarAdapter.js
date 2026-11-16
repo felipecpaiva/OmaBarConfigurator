@@ -67,7 +67,7 @@ function findAreas(root, warn) {
     else if (region !== TRAY_REGION && unknown.indexOf(String(region)) < 0) unknown.push(String(region))
   }
   // Omarchy may have renamed a region: say so once, the rest still draws.
-  if (unknown.length) warn("unknown bar region " + unknown.join(", ") + " (expected " + Object.keys(AREA_OF).concat(TRAY_REGION).join(", ") + ")")
+  if (unknown.length) warn("unknown bar region " + unknown.join(", ") + " (expected " + Object.keys(AREA_OF).concat(TRAY_REGION).join(", ") + ")", true)
   if (!count) { warn("no bar sections found (" + NAMES.ModuleList.join(", ") + ")"); return null }
   return areas
 }

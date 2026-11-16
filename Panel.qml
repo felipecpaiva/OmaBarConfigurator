@@ -8,6 +8,7 @@ import qs.Commons as Commons
 import qs.Ui
 import "Model.js" as Model
 import "lib/PillStyle.js" as PillStyle
+import "lib/Groups.js" as Groups
 
 // Bar widget picker: one row per widget on the bar, grouped by the section it
 // sits in, each with a switch for shown/hidden. A hidden widget keeps its row
@@ -427,9 +428,15 @@ Item {
     path: root.storePath
     watchChanges: true
     atomicWrites: true
+    blockWrites: true // tiny file: the write finishes before the watch reload can read it
     printErrors: false
     onLoaded: root.loadStore(text())
     onFileChanged: reload()
+    // Show what is really on disk, not the text we failed to write.
+    onSaveFailed: function(error) {
+      console.warn("oma-bar-configurator: saving the store failed:", error)
+      reload()
+    }
     // First run: no file yet. Without this branch the store never reports
     // loaded and the first hide would have nowhere to record its entry.
     onLoadFailed: root.loadStore("")
@@ -456,7 +463,10 @@ Item {
   }
 
   function persistPatch(patch) {
-    var text = PillStyle.writeStore(root.lastRawText, patch)
+    commitText(PillStyle.writeStore(root.lastRawText, patch))
+  }
+
+  function commitText(text) {
     root.lastRawText = text
     store.setText(text)
   }
@@ -465,28 +475,27 @@ Item {
   readonly property var storeData: PillStyle.readStore(root.lastRawText)
 
   // Refused before the store has loaded: merging onto an empty text would
-  // write a file without the hidden list.
+  // write a file without the hidden list. Only the keys in `patch` reach the
+  // file; defaults stay in PillStyle.DEFAULTS.
   function writeStyle(patch) {
     if (!root.storeLoaded || !patch) return
-    var merged = ({})
-    var current = root.storeData.style
-    for (var k in current) merged[k] = current[k]
-    for (var p in patch) merged[p] = patch[p]
-    persistPatch({ style: merged })
+    commitText(PillStyle.patchStore(root.lastRawText, "style", patch))
   }
 
   function writeBreaks(area, ids) {
     var areas = ["left", "center", "right"]
     if (!root.storeLoaded || areas.indexOf(String(area)) < 0) return
+    // Copied element by element: a host array fails Array.isArray (FINDINGS.md).
+    var copy = []
+    for (var j = 0; j < (ids || []).length; j++) copy.push(String(ids[j]))
     var breaks = ({})
-    for (var i = 0; i < areas.length; i++) {
-      var list = areas[i] === String(area) ? (ids || []) : root.storeData.groups.breaks[areas[i]]
-      // Copied element by element: a host array fails Array.isArray (FINDINGS.md).
-      var copy = []
-      for (var j = 0; j < list.length; j++) copy.push(String(list[j]))
-      breaks[areas[i]] = copy
-    }
-    persistPatch({ groups: { breaks: breaks } })
+    breaks[String(area)] = copy
+    commitText(PillStyle.patchStore(root.lastRawText, "groups", { breaks: breaks }))
+  }
+
+  function toggleBreak(area, id) {
+    var result = Groups.toggleBreak(root.storeData.groups.breaks, String(area), String(id))
+    writeBreaks(area, result[String(area)])
   }
 
   // The live `bar` object from shell.json, a plain JSON copy. Re-read on
@@ -515,11 +524,19 @@ Item {
     runSequence([["omarchy-bar", "background", v]])
   }
 
+  // One entry per bar-targeted setting.
+  readonly property var barSettings: ({
+    background: {
+      get: function() { return root.barBackground },
+      set: function(value) { root.setBarBackground(value) }
+    }
+  })
+
   function settingValue(setting) {
     if (!setting) return undefined
     var key = String(setting.key || "")
     if (setting.target === "style") return root.storeData.style[key]
-    if (setting.target === "bar" && key === "background") return root.barBackground
+    if (setting.target === "bar" && root.barSettings[key]) return root.barSettings[key].get()
     console.warn("oma-bar-configurator: unknown setting target:", setting.target, key)
     return undefined
   }
@@ -531,8 +548,8 @@ Item {
       var patch = ({})
       patch[key] = value
       writeStyle(patch)
-    } else if (setting.target === "bar" && key === "background") {
-      setBarBackground(value)
+    } else if (setting.target === "bar" && root.barSettings[key]) {
+      root.barSettings[key].set(value)
     } else {
       console.warn("oma-bar-configurator: unknown setting target:", setting.target, key)
     }
@@ -740,8 +757,12 @@ Item {
   }
 
   function setBarTransparent(value) {
-    setBarBackground(value ? "none" : "opaque")
+    setBarBackground(value ? "none" : root.lastSolidBackground)
   }
+
+  // The background before "none" was chosen, so the switch can go back to it.
+  property string lastSolidBackground: "opaque"
+  onBarBackgroundChanged: if (root.barBackground !== "none") root.lastSolidBackground = root.barBackground
 
   function toggleAt(index) {
     var row = rowAt(index)

@@ -70,3 +70,34 @@ round to logical pixels).
 Seen: `tornikegomareli.spaces` paints its own workspace tiles, taller than the pill (box inside a
 pill, architecture risk table). Open design point for Felipe: touching widgets leave no room for
 the full 12 px inner padding or the 8 px gap at a split (review S1).
+
+## Batch 3: settings by topic, groups page, bar background (2026-11-16)
+
+Built in four parallel streams (panel topics shell, settings spec and rows, groups page, style
+limits and window corners), then an independent review, then three parallel fixers. Commit
+cc3668d plus the fix commit.
+
+Design: one spec file `settings/spec.json` defines every setting by topic (Widgets, Pills, Groups,
+Bar), subgroup, label, help and advanced flag, like omahop. Defaults and limits stay in
+`lib/PillStyle.js` only. "Match window corners" reuses Omarchy's `Style.cornerRadius`, which
+already follows Hyprland's `decoration:rounding` and refreshes on config reload (no timer).
+
+Lint: qmllint now gets a temp `qs` link to Omarchy's shell folder, so `qs.*` resolves for real.
+Allowed blind spots: [unqualified], and [missing-property] on the generic types QObject (nested
+Style groups) and QQuickItem (`parent.x`). Proven by a planted file with misspelled properties on
+`ToggleSwitch` and `Rectangle`: the runner failed on both.
+
+Review findings fixed: sliders did not snap (fractional px written, a blocker); the page rebuilt
+every row on every write; the mouse wheel changed sliders instead of scrolling; slider colors were
+hard coded; radius 0 to 999 on a slider (now a number field); color chips too wide (now a
+dropdown); help texts must name their default (tested); store writes dropped unknown nested keys
+and froze every default into the file (now `PillStyle.patchStore`, only changed keys written);
+async writes could be undone by a stale reload (`blockWrites`, `onSaveFailed`); the header
+transparency switch now follows `bar.background` and remembers Glass; a minor painter warning
+could hide the fatal one; repeated widget ids get a disabled switch with a reason; one SELF_ID.
+
+Tests: group layout 19/19, groups 15/15, model 38/38, pill style 16/16, settings spec OK, bar
+adapter OK, contract 21 names, no timers, qualified Color, private names, qmllint (7 files),
+scrub. shellcheck SKIP.
+
+Not checked yet: everything live (the panel has never been opened with this code).

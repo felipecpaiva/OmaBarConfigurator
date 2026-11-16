@@ -27,7 +27,8 @@ BarWidget {
   // Found once per surface; the bar rebuilds the surface, and this widget
   // with it, when the bar turns vertical or a monitor comes and goes.
   property var located: null
-  property bool warned: false
+  property bool warned: false // failures only
+  property bool warnedSoft: false // unknown region: still draws
 
   readonly property var themeColors: ({
     background: String(Commons.Color.background),
@@ -71,10 +72,17 @@ BarWidget {
     })[area]
   }
 
-  function warnOnce(message) {
+  // soft: the adapter can still draw, so it has its own flag and never hides a failure.
+  function warnOnce(message, soft) {
+    if (soft) {
+      if (warnedSoft) return
+      warnedSoft = true
+      console.warn("OmaBar pills: " + message)
+      return
+    }
     if (warned) return
     warned = true
-    console.warn("OmaBar pills: " + message)
+    console.warn("OmaBar pills: " + message + "; drawing no pills")
   }
 
   function scan() {

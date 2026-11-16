@@ -25,36 +25,50 @@ ColumnLayout {
     for (var i = 0; i < list.length; i++) v[list[i].id] = page.panel ? page.panel.settingValue(list[i]) : null
     return v
   }
-  readonly property var rows: SettingsSpec.pageRows(page.group, page.showAdvanced, page.values)
+  // Stable until the group or the advanced switch changes, so a write never rebuilds the rows.
+  readonly property var settings: SettingsSpec.visibleSettings(page.group, page.showAdvanced)
+  readonly property var labels: SettingsSpec.labelsOf(page.group)
+
+  // The page sits in the panel's Flickable; a slider hands wheel turns here.
+  function scrollBy(dy) {
+    var p = page.parent
+    while (p && !(p as Flickable)) p = p.parent
+    var f = p as Flickable
+    if (f) f.contentY = Math.max(0, Math.min(f.contentHeight - f.height, f.contentY - dy))
+  }
 
   Layout.fillWidth: true
   spacing: Style.space(10)
 
   Repeater {
-    model: page.rows
+    model: page.settings
     delegate: ColumnLayout {
       id: item
       required property var modelData
+      required property int index
+      readonly property var state: SettingsSpec.rowState(modelData, page.values, page.labels)
+      readonly property string header: SettingsSpec.subgroupHeader(page.settings, index)
       Layout.fillWidth: true
       spacing: Style.space(6)
 
       PanelSectionHeader {
-        visible: item.modelData.header !== ""
-        text: item.modelData.header
+        visible: item.header !== ""
+        text: item.header
         foreground: page.foreground
         fontFamily: page.fontFamily
         topPadding: Math.ceil(fontSize * 0.15) + Style.space(8)
       }
       SettingRow {
-        setting: item.modelData.setting
-        value: page.values[item.modelData.setting.id]
-        rowEnabled: item.modelData.enabled
-        reason: item.modelData.reason
-        range: SettingsSpec.numberRange(item.modelData.setting, PillStyle.LIMITS)
+        setting: item.modelData
+        value: page.values[item.modelData.id]
+        rowEnabled: item.state.enabled
+        reason: item.state.reason
+        range: SettingsSpec.numberRange(item.modelData, PillStyle.LIMITS)
         foreground: page.foreground
         accent: page.accent
         fontFamily: page.fontFamily
-        onChanged: function (v) { page.panel.setSetting(item.modelData.setting, v) }
+        onChanged: function (v) { page.panel.setSetting(item.modelData, v) }
+        onScrolled: function (dy) { page.scrollBy(dy) }
       }
     }
   }

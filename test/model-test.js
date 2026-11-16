@@ -627,6 +627,10 @@ test("an empty-array setting emits no bar set command", function() {
                          ["pinned"], "a non-empty array is still restored")
 })
 
+tests.push(["SELF_ID is exported", function() {
+  assert.strictEqual(M.SELF_ID, "io.github.felipecpaiva.omabarconfigurator")
+}])
+
 // ------------------------------------------------------------------------ run
 
 var failed = 0

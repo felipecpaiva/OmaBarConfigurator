@@ -10,12 +10,12 @@
           "label": "Show pills", "subgroup": "Basics", "needs": "", "disabledBy": "",
           "help": "Draw a rounded shape behind each group of widgets. Off by default, so the bar keeps its stock look until you turn this on." },
 
-        { "id": "style.radius", "target": "style", "key": "radius", "type": "number", "unit": "px", "step": 1,
+        { "id": "style.radius", "target": "style", "key": "radius", "type": "number", "unit": "px", "step": 1, "control": "field",
           "label": "Corner radius", "subgroup": "Shape", "needs": "style.enabled", "disabledBy": "style.radiusFollowsWindows",
           "help": "How round the corners are. The default is 999, which is fully round (a capsule). 0 is square." },
         { "id": "style.radiusFollowsWindows", "target": "style", "key": "radiusFollowsWindows", "type": "toggle",
           "label": "Match window corners", "subgroup": "Shape", "needs": "style.enabled", "disabledBy": "",
-          "help": "Use the same corner rounding as your windows, so the bar and the windows look alike. Off by default. While on, the corner radius setting is not used." },
+          "help": "Use the same corner rounding as your windows, so the bar and the windows look alike. Off by default. When your windows have square corners, pills are square too. While on, the corner radius setting is not used." },
         { "id": "style.padding", "target": "style", "key": "padding", "type": "number", "unit": "px", "step": 1,
           "label": "Inner padding", "subgroup": "Shape", "needs": "style.enabled", "disabledBy": "",
           "help": "Space between the edge of a pill and the widgets inside it. The default is 12 px." },
@@ -56,7 +56,7 @@
           "values": ["opaque", "glassy", "none"],
           "names": { "opaque": "Solid", "glassy": "Glass", "none": "Clear" },
           "label": "Bar background", "subgroup": "Background", "needs": "", "disabledBy": "",
-          "help": "Solid is a plain bar, Glass lets the wallpaper show through a little, Clear has no background at all. This changes the stock Omarchy bar setting." }
+          "help": "Solid is a plain bar, Glass lets the wallpaper show through a little, Clear has no background at all. Omarchy's default is Solid. This changes the stock Omarchy bar setting." }
       ]
     }
   ]

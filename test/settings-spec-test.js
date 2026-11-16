@@ -54,9 +54,26 @@ assert.strictEqual(S.rowState(d, { "style.enabled": true, "style.f": false }).en
 assert.deepStrictEqual(S.numberRange(Object.assign({}, a, { step: 0.05 }), lim), { min: 0, max: 1, step: 0.05 })
 assert.strictEqual(S.numberRange(a, lim).step, 1)
 
-// pageRows: header only on the first row of a subgroup
-var rows = S.pageRows({ settings: [Object.assign({ subgroup: "X" }, en), Object.assign({ subgroup: "X" }, a), Object.assign({ subgroup: "Y" }, adv)] }, true, { "style.enabled": true })
-assert.deepStrictEqual(rows.map(function (r) { return r.header }), ["X", "", "Y"])
+// subgroupHeader: header only on the first row of a subgroup
+var sl = [{ subgroup: "X" }, { subgroup: "X" }, { subgroup: "Y" }]
+assert.deepStrictEqual(sl.map(function (_, i) { return S.subgroupHeader(sl, i) }), ["X", "", "Y"])
+
+// snap and formatValue
+assert.strictEqual(S.snap(12.4, 1), 12)
+assert.strictEqual(S.snap(0.8500000001, 0.05), 0.85)
+assert.strictEqual(S.snap(0.3, 0.02), 0.3)
+assert.strictEqual(S.formatValue(11.6, 1, "px"), "12 px")
+assert.strictEqual(S.formatValue(0.849, 0.05), "0.85")
+
+// control
+assert.strictEqual(S.control(a), "slider")
+has(mk([en, Object.assign({}, a, { control: "knob" })]), "control must be")
+assert.deepStrictEqual(S.validate(mk([en, Object.assign({}, a, { control: "field" })]), keys, lim), [])
+assert.strictEqual(S.control(S.allSettings(spec).filter(function (r) { return r.id === "style.radius" })[0]), "field")
+
+// every help states its default
+S.allSettings(spec).forEach(function (r) { assert.ok(/default/i.test(r.help), r.id + ": help must state the default") })
+assert.deepStrictEqual(S.colorOptions({ values: ["a"] }), [{ value: "a", label: "a" }, { value: "", label: "Custom" }])
 
 // choiceOptions and isHex
 assert.deepStrictEqual(S.choiceOptions({ values: ["a", "b"], names: { a: "A" } }), [{ value: "a", label: "A" }, { value: "b", label: "b" }])
