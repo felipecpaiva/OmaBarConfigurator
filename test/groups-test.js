@@ -35,6 +35,70 @@ var tests = [
     assert.deepStrictEqual(pills(r.left), [1, 1, 2, 2, 2])
     assert.deepStrictEqual(r.left.map(function (x) { return x.startsPill }), [true, false, true, false, false])
   }],
+  ["endsPill marks the last widget of each pill, never a None", function () {
+    var r = Groups.rows({ left: ["a", "b", "c", "d", "e"] }, { left: ["c"] }, SELF, { noPill: ["e"] })
+    assert.deepStrictEqual(r.left.map(function (w) { return w.endsPill }), [false, true, false, true, false])
+  }],
+  ["seam: join, split, off at the first row", function () {
+    var r = Groups.rows(lay, { left: ["c"] }, SELF).left
+    assert.strictEqual(Groups.seam(r, 0).state, "off")
+    assert.strictEqual(Groups.seam(r, 1).state, "join")
+    assert.strictEqual(Groups.seam(r, 2).state, "split")
+    assert.strictEqual(Groups.seam(r, 9).state, "off")
+  }],
+  ["seam before and after a None widget is locked, cause is the None widget", function () {
+    var r = Groups.rows(lay, {}, SELF, { noPill: ["b"] }).left
+    assert.deepStrictEqual(Groups.seam(r, 1), { state: "locked", reason: "none", cause: 1 })
+    assert.deepStrictEqual(Groups.seam(r, 2), { state: "locked", reason: "none", cause: 1 })
+    assert.strictEqual(Groups.seam(r, 3).state, "join")
+  }],
+  ["seam before and after an Own widget is locked, cause is the Own widget", function () {
+    var r = Groups.rows(lay, {}, SELF, { solo: ["c"] }).left
+    assert.deepStrictEqual(Groups.seam(r, 2), { state: "locked", reason: "own", cause: 2 })
+    assert.deepStrictEqual(Groups.seam(r, 3), { state: "locked", reason: "own", cause: 2 })
+    assert.strictEqual(Groups.seam(r, 1).state, "join")
+  }],
+  ["seam: the next row's mode wins (Own after None)", function () {
+    var r = Groups.rows(lay, {}, SELF, { noPill: ["b"], solo: ["c"] }).left
+    assert.deepStrictEqual(Groups.seam(r, 2), { state: "locked", reason: "own", cause: 2 })
+  }],
+  ["seam before a repeated id is off", function () {
+    var r = Groups.rows({ left: ["a", "x", "b", "x"] }, {}, SELF).left
+    assert.deepStrictEqual(Groups.seam(r, 3), { state: "off", reason: "repeat", cause: -1 })
+  }],
+  ["seam at a center part is locked", function () {
+    var r = Groups.rows({ centerBegin: ["a"], center: ["b"], centerEnd: ["c"] }, {}, SELF, { centerParts: true }).center
+    assert.deepStrictEqual(Groups.seam(r, 1), { state: "locked", reason: "centerPart", cause: -1 })
+    assert.deepStrictEqual(Groups.seam(r, 2), { state: "locked", reason: "centerPart", cause: -1 })
+  }],
+  ["stops: chip, seam, chip per area, empty areas skipped", function () {
+    var s = Groups.stops(Groups.rows({ left: ["a", "b"], right: ["c"] }, {}, SELF))
+    assert.deepStrictEqual(s.map(function (x) { return x.area + ":" + x.kind + ":" + x.index }),
+      ["left:chip:0", "left:seam:1", "left:chip:1", "right:chip:0"])
+    assert.deepStrictEqual(Groups.stops(null), [])
+  }],
+  ["step: walks inside an area and stops at its ends", function () {
+    var s = Groups.stops(Groups.rows({ left: ["a", "b"], right: ["c", "d"] }, {}, SELF))
+    assert.strictEqual(Groups.step(s, -1, 1, 0), 0)
+    assert.strictEqual(Groups.step(s, 0, 1, 0), 1)
+    assert.strictEqual(Groups.step(s, 2, 1, 0), 2)
+    assert.strictEqual(Groups.step(s, 3, -1, 0), 3)
+    assert.strictEqual(Groups.step([], 0, 1, 0), -1)
+  }],
+  ["step: up and down jump areas, keep position, clamp", function () {
+    var s = Groups.stops(Groups.rows({ left: ["a", "b", "c"], right: ["d"] }, {}, SELF))
+    assert.strictEqual(Groups.step(s, 4, 0, 1), 5)
+    assert.strictEqual(Groups.step(s, 0, 0, 1), 5)
+    assert.strictEqual(Groups.step(s, 5, 0, -1), 0)
+    assert.strictEqual(Groups.step(s, 5, 0, 1), 5)
+    assert.strictEqual(Groups.step(s, 0, 0, -1), 0)
+  }],
+  ["locate: same area first, then any area, null when gone", function () {
+    var r = Groups.rows({ left: ["a", "x"], right: ["x", "b"] }, {}, SELF)
+    assert.deepStrictEqual(Groups.locate(r, "right", "x"), { area: "right", index: 0 })
+    assert.deepStrictEqual(Groups.locate(r, "center", "b"), { area: "right", index: 1 })
+    assert.strictEqual(Groups.locate(r, "left", "zz"), null)
+  }],
   ["later copies of an id are marked repeat", function () {
     var r = Groups.rows({ left: ["a", "x", "b", "x"] }, { left: ["x"] }, SELF)
     assert.deepStrictEqual(r.left.map(function (w) { return w.repeat }), [false, false, false, true])

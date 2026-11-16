@@ -351,8 +351,10 @@ Item {
     var meta = widgetMeta(key)
     var category = meta && meta.category ? String(meta.category) : ""
     if (glyphByCategory[category] !== undefined) return glyphByCategory[category]
-    return "󰐱"
+    return root.fallbackGlyph
   }
+  // A widget with only this glyph shows the first letters of its name instead.
+  readonly property string fallbackGlyph: "󰐱"
 
   // The Omarchy mark is not in the icon font -- it is the "omarchy" family's
   // own private-use codepoint, drawn the way the bar's menu button draws it.
@@ -403,6 +405,8 @@ Item {
     root.cursorActive = false
     root.cursorIndex = 0
     root.widgetKeepY = 0
+    root.groupCursorAt = -1
+    root.groupSelected = null
     root.opened = true
     setCenterHoverRevealSuppressed(true)
     // The surface is not mapped yet when open() runs, so a `focus: true`
@@ -524,6 +528,85 @@ Item {
   function setCenterParts(on) {
     if (!root.storeLoaded || root.busy) return
     commitText(PillStyle.patchStore(root.lastRawText, "groups", { centerParts: on === true }))
+  }
+
+  // ---- Groups page: rows, cursor and selection (logic in lib/Groups.js) ----
+  // Lives here, not in the page, so keys work and a pill move keeps the selection.
+  readonly property var groupRows: {
+    var g = root.storeData.groups
+    return Groups.rows(root.liveLayout, g.breaks, Model.SELF_ID, { solo: g.solo, noPill: g.noPill, centerParts: !!g.centerParts })
+  }
+  readonly property var groupStops: Groups.stops(root.groupRows)
+  readonly property bool onGroupsPage: currentGroup.page === "GroupsPage"
+  // Index into groupStops, or -1 before the first key press.
+  property int groupCursorAt: -1
+  // The cursor stop ({ area, kind, index }) while the keyboard drives the page, else null.
+  readonly property var groupCursor: root.groupCursorAt >= 0 && root.groupCursorAt < root.groupStops.length
+    ? root.groupStops[root.groupCursorAt] : null
+  // The widget the detail row shows: { area, index, id }, or null.
+  property var groupSelected: null
+
+  function selectGroupChip(area, index) {
+    var r = root.groupRows[String(area)][index]
+    if (!r) return
+    root.groupSelected = { area: String(area), index: index, id: r.id }
+    for (var i = 0; i < root.groupStops.length; i++) {
+      var s = root.groupStops[i]
+      if (s.area === String(area) && s.kind === "chip" && s.index === index) { root.groupCursorAt = i; break }
+    }
+  }
+
+  // A split or join seam toggles; a locked seam selects the widget whose setting
+  // forces it, so the detail row offers the way out.
+  function clickGroupSeam(area, index) {
+    if (root.busy) return
+    var list = root.groupRows[String(area)]
+    var seam = Groups.seam(list, index)
+    if (seam.state === "split" || seam.state === "join") toggleBreak(String(area), list[index].id)
+    else if (seam.cause >= 0) selectGroupChip(area, seam.cause)
+  }
+
+  function moveGroupCursor(dx, dy) {
+    root.groupCursorAt = Groups.step(root.groupStops, root.groupCursorAt, dx, dy)
+    var s = root.groupCursor
+    if (s && s.kind === "chip") selectGroupChip(s.area, s.index)
+  }
+
+  function activateGroupCursor() {
+    var s = root.groupCursor
+    if (!s) return
+    if (s.kind === "seam") clickGroupSeam(s.area, s.index)
+    else selectGroupChip(s.area, s.index)
+  }
+
+  // s / o / n on the selected widget. Nothing on a seam.
+  function groupModeKey(t) {
+    var mode = ({ s: "shared", o: "solo", n: "none" })[String(t).toLowerCase()]
+    var s = root.groupCursor, sel = root.groupSelected
+    if (!mode || !sel || (s && s.kind !== "chip")) return
+    setWidgetPillMode(sel.id, mode)
+  }
+
+  // Ctrl+Up / Down: the selected widget's pill to the section above or below. Nothing for a None widget.
+  function moveSelectedPill(dy) {
+    var sel = root.groupSelected
+    var r = sel ? root.groupRows[sel.area][sel.index] : null
+    if (!r || r.pill === 0) return
+    var order = ["left", "center", "right"]
+    var to = order.indexOf(sel.area) + (dy > 0 ? 1 : -1)
+    if (to < 0 || to >= order.length) return
+    movePill(sel.area, r.pill, order[to])
+  }
+
+  // After any change the selection follows its widget, and the cursor follows the selection.
+  onGroupRowsChanged: {
+    var sel = root.groupSelected
+    if (!sel) { if (root.groupCursorAt >= root.groupStops.length) root.groupCursorAt = root.groupStops.length - 1; return }
+    var at = Groups.locate(root.groupRows, sel.area, sel.id)
+    if (!at) { root.groupSelected = null; root.groupCursorAt = -1; return }
+    var keyboard = root.groupCursorAt >= 0
+    selectGroupChip(at.area, at.index)
+    if (!keyboard) root.groupCursorAt = -1
   }
 
   // ---- layout API (presets, move pill, undo; logic lives in lib/Presets.js) --
@@ -828,6 +911,7 @@ Item {
     root.layoutError = ""
     checkUnfinished()
     root.cursorActive = false
+    root.groupCursorAt = -1
     keyCatcher.forceActiveFocus()
   }
 
@@ -1215,11 +1299,22 @@ Item {
 
         // The list keys act only while the list is the page on show; Tab
         // and Shift+Tab step through the topics.
-        onMoveRequested: function(dx, dy) { if (dy !== 0 && root.onWidgetsPage) root.moveCursor(dy) }
-        onActivateRequested: if (root.cursorActive && root.onWidgetsPage) root.toggleAt(root.cursorIndex)
+        reorderable: root.onGroupsPage
+        onMoveRequested: function(dx, dy) {
+          if (root.onGroupsPage) root.moveGroupCursor(dx, dy)
+          else if (dy !== 0 && root.onWidgetsPage) root.moveCursor(dy)
+        }
+        onReorderRequested: function(dy) { if (root.onGroupsPage) root.moveSelectedPill(dy) }
+        onActivateRequested: {
+          if (root.onGroupsPage) root.activateGroupCursor()
+          else if (root.cursorActive && root.onWidgetsPage) root.toggleAt(root.cursorIndex)
+        }
         onCloseRequested: root.dismiss()
         onTabRequested: function(direction) { root.stepCategory(direction) }
-        onTextKey: function(t) { if ((t === "u" || t === "U") && root.onWidgetsPage) root.restoreAll() }
+        onTextKey: function(t) {
+          if ((t === "u" || t === "U") && root.onWidgetsPage) root.restoreAll()
+          else if (root.onGroupsPage) root.groupModeKey(t)
+        }
 
       Column {
         id: content
