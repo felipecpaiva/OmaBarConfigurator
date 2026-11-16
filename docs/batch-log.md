@@ -167,3 +167,11 @@ give five center pills instead of three. Panel.qml is about 1700 lines (legacy v
 
 Tests: presets 47/47, group layout 33/33, groups 21/21, pill style, model, settings spec, bar
 adapter, contract, no timers, qualified Color, private names, qmllint, scrub.
+
+Even pills live check (2026-11-16, after Felipe restarted the shell): the same six scenarios
+(default, Spaces Own, Spaces None, Bluetooth Own, clock Own, split center) were applied through
+the store only and screenshotted. Split pills are now even: the Bluetooth Own pill is centered on
+its icon and its neighbours have equal ends; the clock Own and split center pills are even on both
+sides. A pixel-scan measurement was tried and dropped (text and the Spaces tile break the scan
+row); judged on zoomed screenshots instead. Remaining: the Spaces widget's own active tile is
+taller than a pill (a widget-level limit, not OmaBar). Store restored after the test.
