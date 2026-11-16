@@ -110,6 +110,16 @@ function test(name, fn) { tests.push([name, fn]) }
 
 // ------------------------------------------------------------------ catalogue
 
+test("indicators: off removes, last one refused, on goes back to its default place", function() {
+  assert.deepStrictEqual(M.indicatorList(undefined), M.INDICATORS)
+  var off = M.toggleIndicator(undefined, "NightLight", false)
+  assert.strictEqual(off.indexOf("NightLight"), -1)
+  assert.strictEqual(off.length, M.INDICATORS.length - 1)
+  assert.deepStrictEqual(M.toggleIndicator(off, "NightLight", true), M.INDICATORS)
+  assert.strictEqual(M.toggleIndicator(["Dnd"], "Dnd", false), null)
+  assert.deepStrictEqual(M.toggleIndicator([{ id: "Custom" }, "Dnd"], "Reminder", true), ["Reminder", { id: "Custom" }, "Dnd"])
+})
+
 test("letters: initials, skip a leading Omarchy, one word keeps two letters", function() {
   assert.strictEqual(M.letters("Omarchy Gaming Console"), "GC")
   assert.strictEqual(M.letters("Theme modes"), "TM")

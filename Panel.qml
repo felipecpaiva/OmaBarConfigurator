@@ -392,6 +392,9 @@ Item {
 
   // ---- lifecycle -------------------------------------------------------
   property bool opened: false
+  // Pinned: the card stays open, clicks outside it reach the desktop, and keys go to the
+  // card only after a click on it, so you can work in other windows while testing.
+  property bool pinned: false
   property int cursorIndex: 0
   property bool cursorActive: false
   // Widget list scroll position, kept here so it survives the list's rebuilds
@@ -968,6 +971,14 @@ Item {
     }
   })
 
+  // One indicator in or out of the widget's own `items` list (Model.toggleIndicator).
+  function setIndicatorShown(id, on) {
+    if (root.busy || root.indicatorsSetting("id") === undefined) return
+    var next = Model.toggleIndicator(root.indicatorsSetting("items"), String(id), on)
+    if (!next) { root.layoutError = "At least one indicator must stay. To hide them all, hide Indicators in Widgets."; return }
+    runSequence([["omarchy-bar", "set", "omarchy.indicators", "items", JSON.stringify(next), "--json"]])
+  }
+
   // A key of the first omarchy.indicators entry on the bar; undefined when it is not on the bar.
   function indicatorsSetting(key) {
     var lay = root.liveLayout
@@ -985,6 +996,7 @@ Item {
     var key = String(setting.key || "")
     if (setting.target === "style") return root.storeData.style[key]
     if (setting.target === "bar" && root.barSettings[key]) return root.barSettings[key].get()
+    if (setting.target === "indicator") return Model.indicatorList(root.indicatorsSetting("items")).some(function(e) { return (typeof e === "string" ? e : e.id) === key })
     console.warn("oma-bar-configurator: unknown setting target:", setting.target, key)
     return undefined
   }
@@ -998,6 +1010,8 @@ Item {
       writeStyle(patch)
     } else if (setting.target === "bar" && root.barSettings[key]) {
       root.barSettings[key].set(value)
+    } else if (setting.target === "indicator") {
+      root.setIndicatorShown(key, value === true)
     } else {
       console.warn("oma-bar-configurator: unknown setting target:", setting.target, key)
     }
@@ -1382,8 +1396,10 @@ Item {
     // Focus follows the logical state, not `visible`: the surface stays mapped
     // through the fade so there is something to animate, but keyboard and
     // pointer ownership release the moment the panel closes.
-    WlrLayershell.keyboardFocus: root.opened
-      ? WlrKeyboardFocus.Exclusive : WlrKeyboardFocus.None
+    WlrLayershell.keyboardFocus: !root.opened ? WlrKeyboardFocus.None
+      : root.pinned ? WlrKeyboardFocus.OnDemand : WlrKeyboardFocus.Exclusive
+    // Pinned, only the card takes input; the rest of the screen stays usable.
+    mask: Region { item: root.pinned ? card : null }
 
     anchors { top: true; bottom: true; left: true; right: true }
 
@@ -1396,7 +1412,7 @@ Item {
     // Everything outside the card dismisses.
     MouseArea {
       anchors.fill: parent
-      enabled: root.opened
+      enabled: root.opened && !root.pinned
       acceptedButtons: Qt.AllButtons
       onClicked: root.dismiss()
     }

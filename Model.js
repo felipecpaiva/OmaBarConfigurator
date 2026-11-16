@@ -433,6 +433,30 @@ function nextAnchorAfterHiding(shellConfig, id) {
   return survivors[Math.floor(survivors.length / 2)]
 }
 
+// Omarchy's indicators widget: its default list, and the list with one indicator turned on or
+// off. An empty list means "all" to the widget, so the last one cannot be turned off (null).
+// Entries may be strings or objects with an id; others are kept as they are, in their order.
+var INDICATORS = ["PasswordlessSudo", "ScreenRecording", "RemoteSession", "Reminder", "NightLight", "Dnd", "StayAwake"]
+function indicatorId(e) { return typeof e === "string" ? e : (e && typeof e === "object" && e.id !== undefined && e.id !== null ? String(e.id) : "") }
+function indicatorList(items) {
+  var out = []
+  if (items && typeof items.length === "number") for (var i = 0; i < items.length; i++) if (indicatorId(items[i]) !== "") out.push(items[i])
+  return out.length ? out : INDICATORS.slice()
+}
+function toggleIndicator(items, id, on) {
+  var list = indicatorList(items)
+  var has = list.some(function(e) { return indicatorId(e) === id })
+  if (!on) {
+    var rest = list.filter(function(e) { return indicatorId(e) !== id })
+    return rest.length ? rest : null
+  }
+  if (has) return list
+  // Put it back at its default place: after the nearest default before it that is in the list.
+  var at = INDICATORS.indexOf(id), pos = 0
+  for (var k = 0; k < list.length; k++) if (INDICATORS.indexOf(indicatorId(list[k])) >= 0 && INDICATORS.indexOf(indicatorId(list[k])) < at) pos = k + 1
+  return list.slice(0, pos).concat([id], list.slice(pos))
+}
+
 // Two letters for a widget with no known glyph: initials of the first two words, skipping a
 // leading "Omarchy" ("Omarchy Gaming Console" -> "GC"); one word gives "Om" ("omagnet").
 function letters(name) {
@@ -446,6 +470,9 @@ function letters(name) {
 if (typeof module !== "undefined") {
   module.exports = {
     letters: letters,
+    INDICATORS: INDICATORS,
+    indicatorList: indicatorList,
+    toggleIndicator: toggleIndicator,
     barCatalogue: barCatalogue,
     captureEntry: captureEntry,
     hideArgv: hideArgv,

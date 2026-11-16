@@ -66,7 +66,28 @@
           "help": "Solid is a plain bar, Glass lets the wallpaper show through a little, Clear has no background at all. Omarchy's default is Solid. This changes the stock Omarchy bar setting." },
         { "id": "bar.indicatorsAlwaysShow", "target": "bar", "key": "indicatorsAlwaysShow", "type": "toggle",
           "label": "Always show indicators", "subgroup": "Indicators", "needs": "", "disabledBy": "",
-          "help": "Omarchy's indicators (night light, do not disturb, recording and others) show their inactive icons while the pointer is on the bar. That makes the widget wider, so the pills next to it move. On, every indicator shows all the time and nothing moves. Choose which indicators to show in the indicators widget's own settings. Off by default. This changes the stock indicators widget." }
+          "help": "Omarchy's indicators (night light, do not disturb, recording and others) show their inactive icons while the pointer is on the bar. That makes the widget wider, so the pills next to it move. On, every indicator shows all the time and nothing moves. Choose which indicators to show in the indicators widget's own settings. Off by default. This changes the stock indicators widget." },
+        { "id": "indicator.PasswordlessSudo", "target": "indicator", "key": "PasswordlessSudo", "type": "toggle",
+          "label": "Passwordless sudo", "subgroup": "Indicators", "needs": "", "disabledBy": "",
+          "help": "Shows an icon when passwordless admin access is on. Off removes it from the bar, even while it is on. On by default." },
+        { "id": "indicator.ScreenRecording", "target": "indicator", "key": "ScreenRecording", "type": "toggle",
+          "label": "Screen recording", "subgroup": "Indicators", "needs": "", "disabledBy": "",
+          "help": "Shows an icon when the screen is being recorded. Off removes it from the bar, even while it is on. On by default." },
+        { "id": "indicator.RemoteSession", "target": "indicator", "key": "RemoteSession", "type": "toggle",
+          "label": "Remote session", "subgroup": "Indicators", "needs": "", "disabledBy": "",
+          "help": "Shows an icon when someone is connected to this computer. Off removes it from the bar, even while it is on. On by default." },
+        { "id": "indicator.Reminder", "target": "indicator", "key": "Reminder", "type": "toggle",
+          "label": "Reminder", "subgroup": "Indicators", "needs": "", "disabledBy": "",
+          "help": "Shows an icon when a reminder is set. Off removes it from the bar, even while it is on. On by default." },
+        { "id": "indicator.NightLight", "target": "indicator", "key": "NightLight", "type": "toggle",
+          "label": "Night light", "subgroup": "Indicators", "needs": "", "disabledBy": "",
+          "help": "Shows an icon when night light is on. Off removes it from the bar, even while it is on. On by default." },
+        { "id": "indicator.Dnd", "target": "indicator", "key": "Dnd", "type": "toggle",
+          "label": "Do not disturb", "subgroup": "Indicators", "needs": "", "disabledBy": "",
+          "help": "Shows an icon when do not disturb is on. Off removes it from the bar, even while it is on. On by default." },
+        { "id": "indicator.StayAwake", "target": "indicator", "key": "StayAwake", "type": "toggle",
+          "label": "Stay awake", "subgroup": "Indicators", "needs": "", "disabledBy": "",
+          "help": "Shows an icon when stay awake is on. Off removes it from the bar, even while it is on. On by default." }
       ]
     }
   ]
