@@ -27,6 +27,8 @@ Ranked by lowest resource cost first, then most customization. Verdicts approved
 | 14 | CPU and GPU cards with charts | Denial | polling | skip, use an existing plugin | |
 | 15 | Move a whole pill to left, center or right from the panel | Felipe | none | now | 4 |
 | 16 | Real spacing between widgets, so padding and split gaps match Denial | Felipe | unknown | later, needs research | |
+| 17 | "Grouped" preset: all groups centered together with gaps, each growing outward as it fills (impasto style); plus "Spread" to go back | Felipe, impasto | none | now | 4.5 |
+| 18 | Smooth expanding animations for pills and groups, like impasto | Felipe, impasto | small, only while changing | now, measure | 4.5 |
 
 ## Batches
 
@@ -98,6 +100,9 @@ Before release, a visual pass judged on screenshots against Denial, Islands Bar 
   rates ours at least as clean as the two competitors.
 
 ### Batch 5: release v0.2.0
+- **Gate (Felipe, 2026-11-16): no release until Felipe says the experience, quality and results are
+  where he wants them.** Batches before it iterate as long as needed. Commit and push the working
+  branch after every batch so nothing is lost.
 - `uninstall.sh` repeats `omarchy plugin disable` until no painter entry is left.
 - README: what pills are, the install prompt note, the corrected `bar.layout` line, the recovery
   command `omarchy plugin enable io.github.felipecpaiva.omabarconfigurator` if the painter entry is
