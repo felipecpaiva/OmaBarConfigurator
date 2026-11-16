@@ -9,6 +9,8 @@ PLUGIN_DEST="$HOME/.config/omarchy/plugins/$PLUGIN_ID"
 DESKTOP_SRC="$REPO_DIR/omabarconfigurator.desktop"
 DESKTOP_DEST="$HOME/.local/share/applications/omabarconfigurator.desktop"
 MARKER="X-OmaBarConfigurator-Managed=true"
+ICON_SRC="$REPO_DIR/branding/logo/icon-256.png"
+ICON_DEST="$HOME/.local/share/icons/hicolor/256x256/apps/omabar.png"
 
 echo "== 1/3: installing the plugin =="
 shopt -s nullglob
@@ -42,6 +44,8 @@ if [[ -f $DESKTOP_DEST ]] && ! grep -qF "$MARKER" "$DESKTOP_DEST"; then
   echo "Backed up your existing entry to $backup"
 fi
 install -Dm644 "$DESKTOP_SRC" "$DESKTOP_DEST"
+# The launcher icon. Our own file name, so nothing of anyone else's is replaced.
+if [[ -f $ICON_SRC ]]; then install -Dm644 "$ICON_SRC" "$ICON_DEST"; fi
 
 echo
 echo "Done. Super+Space -> Apps -> OmaBar."

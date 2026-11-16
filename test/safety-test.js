@@ -128,7 +128,7 @@ test("uninstall.sh: repeats disable, removes the desktop entry only when marked,
   assert.ok(/-f \$DESKTOP_DEST \]\] && grep -qF "\$MARKER"[^\n]*\n\s*rm -f "\$DESKTOP_DEST"/.test(uninst))
   var code = uninst.replace(/^\s*#.*$/gm, "")
   var removes = code.split("\n").filter(function (l) { return /\brm\b/.test(l) })
-  assert.deepStrictEqual(removes.map(function (l) { return l.trim() }), ['rm -f "$DESKTOP_DEST"', 'rm -rf "$PLUGIN_DEST"'])
+  assert.deepStrictEqual(removes.map(function (l) { return l.trim() }), ['rm -f "$DESKTOP_DEST"', 'rm -f "$ICON_DEST"', 'rm -rf "$PLUGIN_DEST"'])
   assert.ok(!/oma-bar-configurator\.json/.test(code), "the style store is kept")
   assert.ok(uninst.indexOf("omarchy plugin disable") < uninst.indexOf('rm -rf "$PLUGIN_DEST"'), "disable before removing files")
 })

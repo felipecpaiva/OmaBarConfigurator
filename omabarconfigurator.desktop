@@ -2,10 +2,10 @@
 Type=Application
 Name=OmaBar
 GenericName=Omarchy Bar Widgets
-Comment=Show, hide and reorder the widgets on the Omarchy bar
+Comment=Show, hide, reorder and group the widgets on the Omarchy bar
 Exec=omarchy-shell shell toggle io.github.felipecpaiva.omabarconfigurator
 TryExec=omarchy-shell
-Icon=preferences-desktop
+Icon=omabar
 Terminal=false
 StartupNotify=false
 Categories=Settings;DesktopSettings;
