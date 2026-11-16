@@ -38,6 +38,19 @@ else
   echo "OK private names"
 fi
 
+step "local component imports"
+# qmllint does not catch a root file using a panel/ component without `import "panel"`
+# (it broke the live panel once: "CategoryBar is not a type").
+bad_imports=0
+for f in *.qml; do
+  for t in $(ls panel/*.qml 2>/dev/null | xargs -n1 basename | sed 's/[.]qml$//'); do
+    if grep -qE "^[[:space:]]*$t[[:space:]]*[{]" "$f" && ! grep -qE '^import "panel"' "$f"; then
+      echo "FAIL $f uses $t without import \"panel\""; bad_imports=1
+    fi
+  done
+done
+if [[ $bad_imports -eq 0 ]]; then echo "OK local component imports"; else failed=1; fi
+
 step "qmllint"
 if [[ ! -x "$QMLLINT" ]]; then
   echo "SKIP qmllint"

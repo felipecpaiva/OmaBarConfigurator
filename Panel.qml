@@ -11,6 +11,7 @@ import "lib/PillStyle.js" as PillStyle
 import "lib/Groups.js" as Groups
 import "lib/Presets.js" as Presets
 import "lib/PresetTargets.js" as PresetTargets
+import "panel"
 
 // Bar widget picker: one row per widget on the bar, grouped by the section it
 // sits in, each with a switch for shown/hidden. A hidden widget keeps its row
