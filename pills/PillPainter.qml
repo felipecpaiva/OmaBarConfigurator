@@ -77,8 +77,10 @@ BarWidget {
       var top = parent
       while (top.parent) top = top.parent
       var before = BarAdapter.offsetIn(parent, null, vertical)
-      if (area === "left") pills[0].start = -before
-      else pills[pills.length - 1].end = (vertical ? top.height : top.width) - before
+      // One border width past the edge, so the outline does not draw a line along the screen edge.
+      var over = style.borderWidth
+      if (area === "left") pills[0].start = -before - over
+      else pills[pills.length - 1].end = (vertical ? top.height : top.width) - before + over
     }
     return pills
   }
