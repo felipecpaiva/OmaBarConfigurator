@@ -123,7 +123,7 @@ test("install.sh: strict mode, copies lib pills panel settings, validates, marke
 })
 test("uninstall.sh: repeats disable, removes the desktop entry only when marked, keeps the store", function () {
   assert.ok(/^set -uo pipefail$/m.test(uninst))
-  assert.ok(/for _ in 1 2 3 4 5; do[\s\S]*omarchy plugin disable[\s\S]*done/.test(uninst))
+  assert.ok(/for _ in (1 2 3 4 5|\$\(seq 1 [0-9]+\)); do[\s\S]*omarchy plugin disable[\s\S]*done/.test(uninst))
   assert.ok(/\.enabled == true/.test(uninst), "loop ends when the plugin is no longer enabled")
   assert.ok(/-f \$DESKTOP_DEST \]\] && grep -qF "\$MARKER"[^\n]*\n\s*rm -f "\$DESKTOP_DEST"/.test(uninst))
   var code = uninst.replace(/^\s*#.*$/gm, "")
