@@ -35,6 +35,9 @@ var tests = [
     assert.deepStrictEqual(pills(r.left), [1, 1, 2, 2, 2])
     assert.deepStrictEqual(r.left.map(function (x) { return x.startsPill }), [true, false, true, false, false])
   }],
+  ["the spacer is not listed", function () {
+    assert.deepStrictEqual(ids(Groups.rows({ left: ["a", "omarchy.spacer", "b"] }, {}, SELF).left), ["a", "b"])
+  }],
   ["endsPill marks the last widget of each pill, never a None", function () {
     var r = Groups.rows({ left: ["a", "b", "c", "d", "e"] }, { left: ["c"] }, SELF, { noPill: ["e"] })
     assert.deepStrictEqual(r.left.map(function (w) { return w.endsPill }), [false, true, false, true, false])
