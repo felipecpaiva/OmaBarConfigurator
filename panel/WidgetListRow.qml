@@ -81,7 +81,8 @@ Item {
         anchors.left: parent.left
         anchors.right: parent.right
         anchors.top: parent.top
-        anchors.leftMargin: Style.space(10)
+        // An indicator inside the indicators widget sits indented under it.
+        anchors.leftMargin: item.modelData.sub ? Style.space(38) : Style.space(10)
         // 6, not 10: the kit's header switch sits 6 inside the same rail (its
         // cursor-ring pad), so every switch lands on one axis.
         anchors.rightMargin: Style.space(6)

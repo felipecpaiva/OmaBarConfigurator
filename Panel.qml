@@ -157,8 +157,31 @@ Item {
     // The section header rides on the first row of each region.
     for (var j = 0; j < out.length; j++)
       out[j].title = (j === 0 || out[j - 1].region !== out[j].region) ? regionLabel(out[j].region) : ""
+    // The indicators widget holds several icons: one sub-row each, right under it,
+    // so each can be shown or hidden here like a widget (its own `items` setting).
+    for (var k = 0; k < out.length; k++) {
+      if (out[k].id !== "omarchy.indicators" || !out[k].visible) continue
+      var list = Model.indicatorList(root.indicatorsSetting("items")), on = {}
+      for (var m = 0; m < list.length; m++) on[typeof list[m] === "string" ? list[m] : list[m].id] = true
+      var subs = Model.INDICATORS.map(function(name) {
+        return { id: "indicator:" + name, indicator: name, region: out[k].region, visible: on[name] === true,
+                 isAnchor: false, title: "", sub: true }
+      })
+      out = out.slice(0, k + 1).concat(subs, out.slice(k + 1))
+      break
+    }
     return out
   }
+
+  readonly property var indicatorNames: ({
+    PasswordlessSudo: "Passwordless sudo", ScreenRecording: "Screen recording", RemoteSession: "Remote session",
+    Reminder: "Reminder", NightLight: "Night light", Dnd: "Do not disturb", StayAwake: "Stay awake"
+  })
+  // The icons the indicators draw (bar/indicators/*.qml inactiveText).
+  readonly property var indicatorGlyphs: ({
+    PasswordlessSudo: "\u{f07f5}", ScreenRecording: "\u{f0ec2}", RemoteSession: "\u{f08b9}",
+    Reminder: "\u{f088c}", NightLight: "\u{f050e}", Dnd: "\u{f009b}", StayAwake: "\u{ef59}"
+  })
 
   readonly property int shownCount: countVisible(true)
   readonly property int hiddenCount: countVisible(false)
@@ -166,14 +189,14 @@ Item {
   function countVisible(wanted) {
     var n = 0
     for (var i = 0; i < rows.length; i++)
-      if (rows[i].visible === wanted) n++
+      if (!rows[i].sub && rows[i].visible === wanted) n++
     return n
   }
 
   function regionCount(region) {
     var n = 0
     for (var i = 0; i < rows.length; i++)
-      if (rows[i].region === region && rows[i].visible) n++
+      if (!rows[i].sub && rows[i].region === region && rows[i].visible) n++
     return n
   }
 
@@ -351,6 +374,7 @@ Item {
 
   function widgetGlyph(id) {
     var key = String(id || "")
+    if (key.indexOf("indicator:") === 0) return root.indicatorGlyphs[key.slice(10)] || root.fallbackGlyph
     if (glyphById[key] !== undefined) return glyphById[key]
     var source = clonedFrom(key) || siblingId(key)
     if (source !== "" && glyphById[source] !== undefined) return glyphById[source]
@@ -373,6 +397,7 @@ Item {
 
   function widgetName(id) {
     var key = String(id || "")
+    if (key.indexOf("indicator:") === 0) return root.indicatorNames[key.slice(10)] || key.slice(10)
     var info = pluginInfo[key]
     if (info && info.name) return info.name
     var meta = widgetMeta(key)
@@ -1260,6 +1285,7 @@ Item {
     // The list is about to be rebuilt out from under itself; the Widgets page
     // records where it was standing first (panel/WidgetsPage.qml).
     root.toggleStarting()
+    if (row.sub) { setIndicatorShown(row.indicator, !row.visible); return }
     if (row.visible) hideWidget(row)
     else showWidget(row)
   }
@@ -1352,7 +1378,7 @@ Item {
   function restoreAll() {
     if (root.busy) return
     var ids = []
-    for (var i = 0; i < rows.length; i++) if (!rows[i].visible) ids.push(rows[i].id)
+    for (var i = 0; i < rows.length; i++) if (!rows[i].visible && !rows[i].sub) ids.push(rows[i].id)
     root.restoreQueue = ids
     stepRestoreQueue()
   }
