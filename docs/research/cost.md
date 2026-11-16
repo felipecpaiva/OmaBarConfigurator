@@ -73,3 +73,22 @@ Differences (on minus off):
   baseline in both.
 - Pills only change drawing, so the cost should show up as paint work when the layout changes, not
   as idle work. This test measures idle only.
+
+## Rerun after ink padding (2026-11-16, evening)
+
+Same method, 10 windows (off, on alternating, 60 s each after 10 s warm-up), with the painter
+that now walks each widget's items for its visible content (BarAdapter.inkSpan), the spacer, square
+edges and Always show indicators. Quiet machine: load 1.2 to 1.7, CPU 0.93 to 1.10 percent in every
+window. Script: kept in the session scratchpad (`cost/run.py`), store backed up and restored
+byte for byte.
+
+| State | Median CPU % | Mean CPU % | RSS last window (MiB) | RSS median (MiB) |
+|-------|-------------:|-----------:|----------------------:|-----------------:|
+| off | 1.05 | 1.05 | 585.9 | 591.0 |
+| on | 0.98 | 1.00 | 585.8 | 590.3 |
+
+On minus off: CPU median -0.07 points, mean -0.05 points; RSS -0.1 MiB (last) and -0.7 MiB
+(median). **PASS** on both quality-bar lines (at most +0.1 point, at most +2 MB): with pills on the
+shell costs no more than with them off, within noise. Not measured: cost while the pointer moves
+over the bar (needs input, not injected); inkSpan re-runs when any item in a widget changes, so a
+hover animation re-runs it per frame for that area.
