@@ -16,7 +16,12 @@ else
 fi
 
 echo "== 2/3: disabling the plugin =="
-omarchy plugin disable "$PLUGIN_ID" 2>/dev/null || true
+# One disable removes one reference (the bar entry first, then a plugins[]
+# record left from v0.1), so repeat while the plugin is still listed enabled.
+for _ in 1 2 3 4 5; do
+  omarchy-plugin-list --json | jq -e --arg id "$PLUGIN_ID" 'any(.[]; .id == $id and .enabled == true)' >/dev/null 2>&1 || break
+  omarchy plugin disable "$PLUGIN_ID" 2>/dev/null || break
+done
 
 echo "== 3/3: removing the plugin =="
 rm -rf "$PLUGIN_DEST"

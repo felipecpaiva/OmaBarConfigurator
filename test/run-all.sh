@@ -23,6 +23,14 @@ else
 fi
 
 step "private bar names only in pills/BarAdapter.js"
+# Qt 6.12 ships its own Color singleton that hides qs.Commons Color, so every
+# use must be Commons.Color (commit af4ae61, omacom/omarchy#14553).
+if hits=$(grep -nE '(^|[^.A-Za-z_])Color\.' pills/*.qml Panel.qml); then
+  echo "$hits"; echo "FAIL unqualified Color: use Commons.Color"; failed=1
+else
+  echo "OK qualified Color"
+fi
+
 # The distinctive private names of the stock bar (docs/architecture.md section 6).
 if hits=$(grep -rnwE 'widgetKey|widgetHolder|listRows|owner' pills lib 2>/dev/null | grep -v '^pills/BarAdapter\.js:'); then
   echo "$hits"; echo "FAIL private names: use them only in pills/BarAdapter.js"; failed=1

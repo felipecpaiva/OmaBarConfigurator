@@ -2,6 +2,7 @@ import QtQuick
 import Quickshell
 import Quickshell.Io
 import qs.Commons
+import qs.Commons as Commons
 import qs.Ui
 import "BarAdapter.js" as BarAdapter
 import "../lib/GroupLayout.js" as GroupLayout
@@ -29,11 +30,11 @@ BarWidget {
   property bool warned: false
 
   readonly property var themeColors: ({
-    background: String(Color.background),
-    foreground: String(Color.foreground),
-    accent: String(Color.accent),
-    urgent: String(Color.urgent),
-    muted: String(Color.muted)
+    background: String(Commons.Color.background),
+    foreground: String(Commons.Color.foreground),
+    accent: String(Commons.Color.accent),
+    urgent: String(Commons.Color.urgent),
+    muted: String(Commons.Color.muted)
   })
   readonly property var look: ({
     vertical: root.vertical,
