@@ -164,4 +164,10 @@ try {
   console.log("SKIP bar-adapter pipeline: lib/GroupLayout.js not present")
 }
 
+assert.strictEqual(A.solidBar({ glassy: false, transparent: false }), true)
+assert.strictEqual(A.solidBar({ glassy: true, transparent: false }), false)
+assert.strictEqual(A.solidBar({ glassy: false, transparent: true }), false)
+assert.strictEqual(A.solidBar({}), false)
+assert.strictEqual(A.solidBar(null), false)
+
 console.log("OK bar-adapter")

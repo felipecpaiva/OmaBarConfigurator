@@ -36,7 +36,7 @@
           "values": ["background", "foreground", "accent", "urgent", "muted"],
           "names": { "background": "Background", "foreground": "Text", "accent": "Accent", "urgent": "Urgent", "muted": "Muted" },
           "label": "Fill color", "subgroup": "Color", "needs": "style.enabled", "disabledBy": "",
-          "help": "A color from your theme, so pills follow the theme when you switch it. Or type your own #rrggbb. The default is Background." },
+          "help": "A color from your theme, so pills follow the theme when you switch it. Or type your own #rrggbb. The default is Background. On a Solid bar, Background is tinted a little toward the text color so the pills still show." },
         { "id": "style.fillOpacity", "target": "style", "key": "fillOpacity", "type": "number", "step": 0.05,
           "label": "Fill opacity", "subgroup": "Color", "needs": "style.enabled", "disabledBy": "",
           "help": "0 is see-through and 1 is solid. The default is 0.85." },

@@ -146,8 +146,16 @@ function areaSlots(located, area, vertical) {
   return out
 }
 
+// True for a Solid bar: painted in its own background color, neither glassy nor clear.
+// Unknown bars count as not solid, so the pill look never changes by guess.
+function solidBar(bar) {
+  if (!bar || typeof bar.glassy !== "boolean" || typeof bar.transparent !== "boolean") return false
+  return !bar.glassy && !bar.transparent
+}
+
 if (typeof module !== "undefined") {
   module.exports = {
+    solidBar: solidBar,
     NAMES: NAMES,
     surfaceRoot: surfaceRoot,
     findAreas: findAreas,
