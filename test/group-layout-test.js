@@ -70,8 +70,8 @@ var tests = [
   ["gap clamp between touching neighbours", function () {
     // content edges 8 apart (mid = 24): padded pills would overlap, so each backs off gap/2
     var r = run([S("a", 0, 20), S("b", 28, 48)], ["b"], { padding: 8, gap: 4 })
-    assert.deepStrictEqual([r[0].start, r[0].end], [-8, 22])
-    assert.deepStrictEqual([r[1].start, r[1].end], [26, 56])
+    assert.deepStrictEqual([r[0].start, r[0].end], [-2, 22]) // even: left pad cut to the 2 px the split leaves
+    assert.deepStrictEqual([r[1].start, r[1].end], [26, 50])
   }],
   ["touching neighbours get exactly gap between pills", function () {
     var t = run(row, ["c"], { padding: 8, gap: 4 })
@@ -88,7 +88,7 @@ var tests = [
   }],
   ["vertical-style coordinates", function () {
     var r = run([S("a", 4, 28), S("b", 32, 52)], ["b"], { padding: 3, gap: 2 })
-    assert.deepStrictEqual([r[0].start, r[0].end, r[1].start, r[1].end], [1, 29, 31, 55])
+    assert.deepStrictEqual([r[0].start, r[0].end, r[1].start, r[1].end], [3, 29, 31, 53])
   }],
   ["garbage input never throws", function () {
     [undefined, null, 5, "x", [], {}].forEach(function (g) {
@@ -105,8 +105,8 @@ var tests = [
   ["outer pills stop at the min and max bounds", function () {
     var r = G.pills({ left: [{ id: "a", start: 8, end: 40 }], right: [{ id: "z", start: 1200, end: 1272 }] }, {},
       { padding: 12, gap: 8, min: 5, max: 1275 })
-    assert.deepStrictEqual([r.left[0].start, r.left[0].end], [5, 52])
-    assert.deepStrictEqual([r.right[0].start, r.right[0].end], [1188, 1275])
+    assert.deepStrictEqual([r.left[0].start, r.left[0].end], [5, 43])
+    assert.deepStrictEqual([r.right[0].start, r.right[0].end], [1197, 1275])
     var free = G.pills({ left: [{ id: "a", start: 8, end: 40 }] }, {}, { padding: 12 })
     assert.strictEqual(free.left[0].start, -4)
   }]
@@ -128,7 +128,7 @@ tests.push(
   }],
   ["solo gets the gap and the bounds like any split", function () {
     var r = run(row, [], { padding: 4, gap: 6, min: 2, solo: ["b"] })
-    assert.deepStrictEqual(r.map(function (p) { return [p.start, p.end] }), [[2, 7], [13, 17], [23, 44]])
+    assert.deepStrictEqual(r.map(function (p) { return [p.start, p.end] }), [[3, 7], [13, 17], [23, 37]])
   }],
   ["noPill splits and draws nothing", function () {
     assert.deepStrictEqual(groupsOf(run(row, [], withOpts({ noPill: ["b"] }))), ["a", "cd"])
@@ -176,13 +176,13 @@ tests.push(
     var l = [S("a", 0, 100), S("ws", 100, 300), S("b", 300, 400)]
     var o = function (gap) { return { padding: 12, gap: gap, noPill: ["ws"] } }
     var r = run(l, [], o(0))
-    assert.deepStrictEqual(r.map(function (p) { return [p.start, p.end] }), [[-12, 100], [300, 412]])
+    assert.deepStrictEqual(r.map(function (p) { return [p.start, p.end] }), [[0, 100], [300, 400]]) // even: the free end shrinks to match the None end
     r = run(l, [], o(8)) // half a gap of air on each side
-    assert.deepStrictEqual(r.map(function (p) { return [p.start, p.end] }), [[-12, 96], [304, 412]])
+    assert.deepStrictEqual(r.map(function (p) { return [p.start, p.end] }), [[4, 96], [304, 396]])
     r = run(l.slice(0, 2), [], o(0)) // None at the area edge, one pill before
-    assert.deepStrictEqual(r.map(function (p) { return [p.start, p.end] }), [[-12, 100]])
+    assert.deepStrictEqual(r.map(function (p) { return [p.start, p.end] }), [[0, 100]])
     r = run(l.slice(1), [], o(0)) // None at the area edge, one pill after
-    assert.deepStrictEqual(r.map(function (p) { return [p.start, p.end] }), [[300, 412]])
+    assert.deepStrictEqual(r.map(function (p) { return [p.start, p.end] }), [[300, 400]])
   }],
   ["None widget: a pill that would collapse keeps its slot bounds", function () {
     var r = run([S("n", 0, 10), S("a", 10, 20)], [], { padding: 0, gap: 40, noPill: ["n"] })
@@ -192,6 +192,65 @@ tests.push(
     [null, 3, "s", {}, { length: "x" }, [1, null]].forEach(function (v) {
       assert.deepStrictEqual(groupsOf(run(row, [], withOpts({ solo: v, noPill: v, centerParts: v }))), ["abcd"])
     })
+  }]
+)
+
+function pads(p, slots) {
+  var f = slots.filter(function (s) { return p.ids.indexOf(s.id) >= 0 })
+  return [f[0].start - p.start, p.end - f[f.length - 1].end]
+}
+function near(a, b) { assert.ok(Math.abs(a - b) < 1e-9, a + " vs " + b) }
+var O = { padding: 12, gap: 4 }
+
+tests.push(
+  ["even pills: a break gives both pills equal pads of -gap/2", function () {
+    var r = run(row, ["c"], O)
+    pads(r[0], row).forEach(function (v, i) { near(v, i === 0 ? -2 : -2) })
+    pads(r[1], row).forEach(function (v) { near(v, -2) })
+    assert.deepStrictEqual([r[0].end, r[1].start], [18, 22])
+  }],
+  ["even pills: solo in the middle is centred, pads match its neighbours' facing pads", function () {
+    var r = run(row, [], { padding: 12, gap: 4, solo: ["b"] })
+    pads(r[1], row).forEach(function (v) { near(v, -2) })
+    near((r[1].start + r[1].end) / 2, 15)
+    near(pads(r[0], row)[1], -2)
+    near(pads(r[2], row)[0], -2)
+  }],
+  ["even pills: a single free pill keeps full padding on both ends", function () {
+    assert.deepStrictEqual(run(row, [], O), [{ start: -12, end: 52, ids: ["a", "b", "c", "d"] }])
+  }],
+  ["even pills: min clamp makes both ends equal", function () {
+    var r = run(row, [], { padding: 12, gap: 4, min: -5 })
+    assert.deepStrictEqual([r[0].start, r[0].end], [-5, 45])
+    var m = G.pills({ right: [S("z", 100, 140)] }, {}, { padding: 12, max: 150 }).right
+    assert.deepStrictEqual([m[0].start, m[0].end], [90, 150])
+  }],
+  ["even pills: None neighbour", function () {
+    var l = [S("a", 0, 100), S("ws", 100, 300), S("b", 300, 400)]
+    var r = run(l, [], { padding: 12, gap: 4, noPill: ["ws"] })
+    assert.deepStrictEqual(r.map(function (p) { return [p.start, p.end] }), [[2, 98], [302, 398]])
+  }],
+  ["even pills: random layouts have equal pads and no overlap", function () {
+    var seed = 12345
+    function rnd() { seed = (seed * 1664525 + 1013904223) % 4294967296; return seed / 4294967296 }
+    for (var t = 0; t < 400; t++) {
+      var n = 1 + Math.floor(rnd() * 8), x = Math.floor(rnd() * 20), slots = [], ids = []
+      for (var i = 0; i < n; i++) {
+        var w = 4 + Math.floor(rnd() * 40)
+        slots.push(S("w" + i, x, x + w)); ids.push("w" + i); x += w + (rnd() < 0.3 ? Math.floor(rnd() * 15) : 0)
+      }
+      var pick = function (q) { return ids.filter(function () { return rnd() < q }) }
+      var o = { padding: Math.floor(rnd() * 16), gap: Math.floor(rnd() * 12), solo: pick(0.2), noPill: pick(0.15) }
+      if (rnd() < 0.4) o.min = Math.floor(rnd() * 20) - 10
+      if (rnd() < 0.4) o.max = x + Math.floor(rnd() * 20) - 10
+      var r = run(slots, pick(0.3), o), none = slots.filter(function (s) { return o.noPill.indexOf(s.id) >= 0 })
+      r.forEach(function (p, k) {
+        var pd = pads(p, slots)
+        if (p.end - p.start > 1 + 1e-9 && pd[0] !== 0) near(pd[0], pd[1])
+        if (k) assert.ok(p.start >= r[k - 1].end - 1e-9, "overlap " + JSON.stringify(r))
+        none.forEach(function (s) { if (pd[0] !== 0 || pd[1] !== 0) assert.ok(p.end <= s.start + 1e-9 || p.start >= s.end - 1e-9, "hits None") })
+      })
+    }
   }]
 )
 

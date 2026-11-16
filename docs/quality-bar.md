@@ -15,8 +15,9 @@ screenshots only (grim), and never inject keyboard or mouse input.
 Reference: Denial's bar (sizes in [plan.md](plan.md), Decisions). Islands Bar and Nyxiri are the
 competitors to match or beat.
 
-- [ ] Pills use the default sizes exactly: fully round ends, 12 px inner padding, 8 px gap,
-  5 px space above and below. Measured on a screenshot, tolerance 1 px.
+- [ ] Pills use the default sizes exactly: fully round ends, 12 px inner padding for unsplit pills,
+  4 px gap, 5 px space above and below. Measured on a screenshot, tolerance 1 px.
+- [ ] Every pill has the same space at both ends, within 1 px, measured on a screenshot.
 - [ ] Pill edges sit on whole pixels at scale 1 and at the machine's own scale. No blurry edges.
 - [ ] Each widget sits centered across the pill's height, within 1 px.
 - [ ] The clock stays exactly centered on the screen, with and without the painter. Measured, 0 px.

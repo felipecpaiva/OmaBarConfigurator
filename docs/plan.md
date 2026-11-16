@@ -114,7 +114,7 @@ Before release, a visual pass judged on screenshots against Denial, Islands Bar 
 
 1. (2026-11-16) The bar entry is called **OmaBar pills**. It is invisible, one per bar.
 2. (2026-11-16) Default style uses Denial's sizes: fully round radius, 12 px inner padding, 8 px
-   gap between pills, 5 px space above and below.
+   gap between pills (the original target; the default gap is now 4 px, decision 9), 5 px space above and below.
 3. (2026-11-16) **Option 1, one hidden painter**, replaces many Group markers. Reason: Omarchy
    cannot add a second copy of a third-party bar widget, and removing every entry turns the plugin
    off (architecture.md section 2.2). Groups live in the panel and the store; default is one pill
@@ -136,3 +136,8 @@ Before release, a visual pass judged on screenshots against Denial, Islands Bar 
    `pillBackground=false`, `pillBorder=false`, `activeStyle=subtle` (applied with `omarchy bar set`,
    booleans with `--json`). The active workspace keeps a full height tile (`activeStyle` has no off
    value), so the next look test tries OmaBar's "None" pill mode on Spaces.
+9. (2026-11-16) **Even pills, default gap 4.** Every pill has the same padding at both ends; a split
+   pill shrinks both ends to match. Reason: a live look test showed split pills were lopsided.
+   Widgets touch, so a split can only take its gap from the widgets' own edges (about 8.5 px):
+   gap 8 leaves about 4.5 px, gap 4 leaves about 6.5 px. Denial's 8 px gap needs real spacing
+   (row 16).

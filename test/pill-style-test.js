@@ -17,7 +17,7 @@ test("clamps every ranged number", function() {
 test("wrong types fall back with one warning each", function() {
   var n = P.normalize({ gap: "wide", enabled: "yes", color: "teal", radius: NaN })
   assert.strictEqual(n.warnings.length, 4)
-  assert.strictEqual(n.style.gap, 8)
+  assert.strictEqual(n.style.gap, 4)
   assert.strictEqual(n.style.enabled, false)
   assert.strictEqual(n.style.color, "background")
   assert.strictEqual(n.style.radius, 999)
@@ -155,7 +155,7 @@ test("patchStore round trip with hidden", function() {
   var r = P.readStore(t)
   assert.deepStrictEqual(r.hidden, [{ id: "h" }])
   assert.strictEqual(r.style.enabled, true)
-  assert.strictEqual(r.style.gap, 8)
+  assert.strictEqual(r.style.gap, 4)
 })
 
 test("group rules are validated on read", function() {
