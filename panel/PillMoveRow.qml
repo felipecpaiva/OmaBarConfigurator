@@ -37,6 +37,7 @@ Item {
     spacing: Style.space(4)
     focusable: false
     enabled: !!(row.panel && !row.panel.busy)
+    opacity: enabled ? 1 : 0.4
     options: [
       { value: "left", label: "Left", tooltip: "Move every widget of this pill to the left section" },
       { value: "center", label: "Center", tooltip: "Move every widget of this pill to the center section" },

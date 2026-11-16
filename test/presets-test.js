@@ -112,9 +112,10 @@ var tests = [
     })
     var out = P.applyMoves(lay, argv)
     assert.deepStrictEqual(ids(out.left), [SELF])
-    lay.left.push({ noId: true }) // the CLI cannot move an entry with no id, so the plan fails cleanly
-    assert.deepStrictEqual(P.presetPlan(lay, "denial", ROLES).argv, [])
-    assert.ok(P.presetPlan(lay, "denial", ROLES).error)
+    lay.left.push({ noId: true }) // the CLI cannot move an entry with no id; the plan never needs to
+    var noId = P.presetPlan(lay, "denial", ROLES)
+    assert.strictEqual(noId.error, "")
+    assert.deepStrictEqual(P.applyMoves(lay, noId.argv).left, [{ id: SELF }, { noId: true }])
     assert.deepStrictEqual(ids(out.center), ["tornikegomareli.spaces", "google-calendar.clock"])
   }],
   ["apply, undo, apply: byte identical, inline settings included", function () {
@@ -191,6 +192,49 @@ var tests = [
     var lay = shaped({ left: ["a"] })
     assert.deepStrictEqual(P.movePillPlan(lay, {}, "left", 1, "left").argv, [])
     assert.ok(P.movePillPlan(lay, {}, "left", 5, "right").error)
+  }],
+  ["Denial refuses when no workspaces widget is on the bar", function () {
+    var lay = shaped({ left: ["a", "b"], right: [{ id: SELF }] })
+    var plan = P.presetPlan(lay, "denial", { workspaces: ["omarchy.workspaces"], selfId: SELF }, { left: ["b"] })
+    assert.deepStrictEqual(plan.argv, [])
+    assert.strictEqual(plan.error, "No workspaces widget found on the bar, so the Denial preset has nothing to put in the center.")
+    assert.deepStrictEqual(plan.breaks.left, ["b"])
+    assert.ok(P.presetPlan(lay, "denial", {}).error)
+  }],
+  ["Denial never moves the painter (2000 seeded layouts) and reaches the target", function () {
+    var seed = 12345
+    function rnd(n) { seed = (seed * 1103515245 + 12345) % 2147483648; return Math.floor(seed / 2147483648 * n) }
+    var secs = ["left", "centerBegin", "center", "centerEnd", "right"]
+    for (var n = 0; n < 2000; n++) {
+      var pool = ["w", SELF, "a", "b", "c", "d", "e"].sort(function () { return rnd(3) - 1 }), lay = shaped({})
+      pool.slice(0, 2 + rnd(6)).forEach(function (id) { lay[secs[rnd(5)]].push(id) })
+      if (rnd(2)) lay.tray.push("t")
+      var plan = P.presetPlan(lay, "denial", { workspaces: ["w"], selfId: SELF })
+      var hasW = JSON.stringify(lay).indexOf('"w"') >= 0
+      if (!hasW) { assert.ok(plan.error); continue }
+      assert.strictEqual(plan.error, "", j(lay))
+      plan.argv.forEach(function (a) { assert.notStrictEqual(a[2], SELF, j(lay)) })
+      var want = shaped({ tray: lay.tray })
+      secs.forEach(function (s) {
+        lay[s].forEach(function (id) { want[id === SELF ? s : id === "w" ? "center" : "right"].push(id) })
+      })
+      assert.strictEqual(j(P.applyMoves(lay, plan.argv)), j(want), j(lay) + j(plan.argv))
+    }
+  }],
+  ["undo plan ignores key order and missing sections", function () {
+    var cur = { right: ["a"], left: ["b"] }, snap = { left: ["b"], right: ["a"], tray: [] }
+    assert.deepStrictEqual(P.undoPlan(cur, snap), { argv: [], error: "" })
+    var swapped = P.undoPlan({ right: ["a", "b"] }, { tray: [], left: ["a"], right: ["b"] })
+    assert.strictEqual(swapped.error, "")
+    assert.deepStrictEqual(P.applyMoves({ right: ["a", "b"] }, swapped.argv).left, ["a"])
+  }],
+  ["Denial returns breaks without the moved widgets", function () {
+    var lay = real(), brk = { left: ["tornikegomareli.spaces", "x"], center: ["omarchy.weather"], right: ["omarchy.battery"], extra: ["no"] }
+    var plan = P.presetPlan(lay, "denial", ROLES, brk)
+    assert.deepStrictEqual(plan.breaks, { left: ["x"], center: [], right: ["omarchy.battery"] })
+    assert.deepStrictEqual(brk.left, ["tornikegomareli.spaces", "x"])
+    assert.deepStrictEqual(P.presetPlan(lay, "denial", ROLES).breaks, { left: [], center: [], right: [] })
+    assert.deepStrictEqual(P.presetPlan(lay, "nope", ROLES, brk).breaks.left, brk.left)
   }],
   ["garbage never throws", function () {
     var junk = [undefined, null, 0, "x", [], {}, { left: "nope" }, { left: [null, 5, {}] }, [[1, 2]]]

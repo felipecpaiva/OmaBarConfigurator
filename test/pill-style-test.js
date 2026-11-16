@@ -134,6 +134,21 @@ test("undo: absent or bad is null, good one round trips, patches keep it, null c
   assert.strictEqual(P.readStore(t).undo, null)
   assert.strictEqual(P.readStore(t).style.enabled, true)
 })
+test("undo.running: only true is true, round trips, survives other writes", function() {
+  var u = { layout: { left: ["a"] }, label: "Moved a pill", running: true }
+  var t = P.writeStore("", { undo: u })
+  assert.strictEqual(P.readStore(t).undo.running, true)
+  t = P.patchStore(t, "groups", { breaks: { left: ["a"] } })
+  assert.strictEqual(P.readStore(t).undo.running, true)
+  var r = P.readStore(t).undo
+  r.running = false
+  t = P.writeStore(t, { undo: r })
+  assert.strictEqual(P.readStore(t).undo.running, false)
+  assert.deepStrictEqual(P.readStore(t).undo.layout, u.layout)
+  ;[undefined, "yes", 1, null, "true"].forEach(function(v) {
+    assert.strictEqual(P.readStore(JSON.stringify({ undo: { layout: {}, running: v } })).undo.running, false)
+  })
+})
 test("patchStore round trip with hidden", function() {
   var t = P.writeStore("", { hidden: [{ id: "h" }] })
   t = P.patchStore(t, "style", { enabled: true })

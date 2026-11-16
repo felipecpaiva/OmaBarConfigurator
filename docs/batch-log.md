@@ -111,3 +111,28 @@ control (no slider dragged, no switch changed), mouse wheel over a slider.
 
 Found (from v0.1, not batch 3): the Widgets page lists only left, center and right, so widgets in
 `centerBegin` and `centerEnd` are missing from it (Model.js REGIONS). Planned as a fix in batch 4.
+
+## Batch 4: Denial preset, move a whole pill, Undo (2026-11-16)
+
+Three parallel streams (move logic with a simulator of `omarchy-bar move`, the Widgets list fix
+for centerBegin and centerEnd, panel wiring and the Layout topic), an independent review, three
+parallel fixers. Commits c2db0bf plus the fix commit.
+
+Review: no blocker. The reviewer ported Omarchy's `moveBarEntry` and `barTarget` and replayed
+40,000 random layouts through the planner: 0 mismatches, every Denial and every move then Undo
+returns the original. On a copy of the real bar Denial is 7 moves and Undo restores it with
+inline settings. Moves use exact addressing, so anchor defaults, before/after and clones never
+apply, and a stale plan fails instead of moving the wrong widget. The real `barTarget` clamps
+any index to the section length (PluginRegistry.qml barTarget), so "end of section" moves are safe.
+
+Fixed: closing the panel mid run (records `running` in the undo record, warns on next open,
+and blocks new changes until Undo); Undo and every run now verify the live layout against the
+target before clearing or writing anything; Denial refuses when no workspaces widget is found;
+the painter is never moved (2000 seeded random layouts); no false refusal from key order;
+Denial drops stale breaks; the resolved center anchor is used; switches locked and buttons dimmed
+while a run is in progress. keepLoaded was considered and rejected: not free while idle.
+
+Tests: presets 30/30, pill style 18/18, model 41/41, groups 15/15, group layout 19/19, settings
+spec, bar adapter, contract, no timers, qualified Color, private names, qmllint, scrub.
+
+Not checked yet: the live run on Felipe's bar (supervised, with a shell.json backup).

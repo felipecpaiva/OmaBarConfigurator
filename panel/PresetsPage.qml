@@ -98,6 +98,7 @@ Column {
         foreground: page.foreground
         bordered: true
         enabled: !page.busy
+        opacity: enabled ? 1 : 0.4
         onClicked: page.panel.applyPreset(card.modelData.id)
       }
     }
@@ -139,6 +140,7 @@ Column {
       foreground: page.foreground
       bordered: true
       enabled: page.canUndo && !page.busy
+      opacity: enabled ? 1 : 0.4
       onClicked: page.panel.undoLayout()
     }
   }

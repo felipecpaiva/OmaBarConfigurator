@@ -385,6 +385,8 @@ Item {
     // No payload keys are defined yet; parse anyway so a caller passing one
     // cannot throw its way past the rest of this function.
     try { JSON.parse(payloadJson || "{}") } catch (e) {}
+    root.layoutError = ""
+    checkUnfinished()
     store.reload()
     refreshLive()
     refreshPluginInfo()
@@ -459,6 +461,7 @@ Item {
       console.warn("oma-bar-configurator:", parsed.warnings[i])
     root.savedHidden = parsed.hidden
     root.storeLoaded = true
+    checkUnfinished()
   }
 
   function persistStore() {
@@ -505,11 +508,24 @@ Item {
   readonly property bool canUndo: root.storeData.undo !== null
   readonly property string undoLabel: root.canUndo ? root.storeData.undo.label : ""
   readonly property string undoAt: root.canUndo ? root.storeData.undo.at : ""
-  // The last refusal or failed command, in plain words; cleared by the next run.
+  // The last refusal or failed command, in plain words; cleared by the next run,
+  // on open and on a topic switch.
   property string layoutError: ""
-  // True while a layout run is in flight; afterLayout runs once it ends with no failed step.
+  // True while a layout run is in flight. When it ends with no failed step,
+  // the bar is checked against layoutWant; afterLayout runs only on a match.
   property bool layoutRun: false
   property var afterLayout: null
+  property var layoutWant: null
+  property string layoutMismatch: ""
+
+  // Closing the panel unloads it (shell.qml Loader `active`), which ends a run
+  // between two moves. The undo record says `running` until the run ends, so
+  // the next open can say so; Undo stays available.
+  function checkUnfinished() {
+    if (root.layoutRun || root.busy) return
+    var u = root.storeData.undo
+    if (u && u.running) root.layoutError = "The last change did not finish. Use Undo in Layout to go back."
+  }
 
   // Widgets that count as "the workspaces widget" for presets: the stock one,
   // a clone of it, or a compositor widget whose own name or description says
@@ -533,21 +549,52 @@ Item {
         if (id !== "" && found.indexOf(id) < 0 && root.isWorkspacesWidget(id)) found.push(id)
       }
     }
-    return { workspaces: found, selfId: Model.SELF_ID, centerAnchor: String(root.liveBar.centerAnchor || "") }
+    // The resolved anchor, the one the rest of the panel shows and locks.
+    return { workspaces: found, selfId: Model.SELF_ID, centerAnchor: Model.centerAnchorId({ bar: root.liveBar }) }
   }
 
   // Saved before any command runs, so a run that fails halfway can still be undone.
   function saveUndo(label) {
     persistPatch({ undo: { layout: Presets.snapshot(root.liveLayout), breaks: root.storeData.groups.breaks,
-                           label: label, at: new Date().toISOString() } })
+                           label: label, at: new Date().toISOString(), running: true } })
   }
 
-  function runLayout(argv, after) {
+  // `after(text)` returns the store text to commit once the bar matches `want`;
+  // on a mismatch it is skipped and `mismatch` is shown instead.
+  function runLayout(argv, want, after, mismatch) {
     root.layoutError = ""
-    if (!argv || argv.length === 0) { if (after) after(); return }
+    if (!argv || argv.length === 0) { if (after) commitText(after(root.lastRawText)); return }
     root.layoutRun = true
+    root.layoutWant = want
     root.afterLayout = after || null
+    root.layoutMismatch = mismatch
     runSequence(argv)
+  }
+
+  // Moves go over IPC (omarchy-bar cmd_move -> shell moveBarWidget), and the
+  // shell writes shell.json with an async setText (userConfigFile has no
+  // blockWrites, shell.qml:148), so the file can lag the last exit. The host
+  // updates its config and pushes barConfig (syncPluginApis, shell.qml:904)
+  // before it answers the IPC call, so `shellConfig` is the bar as it is now.
+  function endLayout(after, want, mismatch) {
+    var u = PillStyle.readStore(root.lastRawText).undo
+    var text = root.lastRawText
+    if (u && u.running) {
+      u.running = false
+      text = PillStyle.writeStore(text, { undo: u })
+    }
+    if (want !== null) {
+      var live = root.shellConfig.bar ? root.shellConfig.bar.layout : null
+      root.liveBar = root.shellConfig.bar || ({})
+      var r = Presets.undoPlan(live, want)
+      if (!r.error && r.argv.length === 0) { if (after) text = after(text) }
+      else root.layoutError = mismatch
+    }
+    if (text !== root.lastRawText) commitText(text)
+  }
+
+  function writeBreaksText(text, breaks) {
+    return breaks ? PillStyle.patchStore(text, "groups", { breaks: breaks }) : text
   }
 
   // Every planner refuses with a message rather than half a plan; a throw is
@@ -559,21 +606,40 @@ Item {
     }
   }
 
+  // An unfinished run keeps its snapshot; a new change would overwrite it with
+  // the half-moved bar, so only Undo may run until it is resolved.
+  function blockedByUnfinished() {
+    var u = root.storeData.undo
+    if (!u || u.running !== true) return false
+    root.layoutError = "The last change did not finish. Use Undo in Layout first."
+    return true
+  }
+
   function applyPreset(id) {
-    if (root.busy || !root.storeLoaded) return
+    if (root.busy || !root.storeLoaded || blockedByUnfinished()) return
     refreshLive()
     var label = String(id)
     for (var i = 0; i < Presets.PRESETS.length; i++)
       if (Presets.PRESETS[i].id === label) label = Presets.PRESETS[i].label
-    var p = plan(function() { return Presets.presetPlan(root.liveLayout, String(id), root.layoutRoles()) })
+    var p = plan(function() {
+      return Presets.presetPlan(root.liveLayout, String(id), root.layoutRoles(), root.storeData.groups.breaks)
+    })
     if (p.error) { root.layoutError = String(p.error); return }
     if (!p.argv || p.argv.length === 0) { root.layoutError = "Nothing to move: the bar already looks like this."; return }
     saveUndo(label + " preset")
-    runLayout(p.argv, null)
+    runPlanned(p)
+  }
+
+  // Apply and Move: the bar must end up as the plan's own replay says.
+  function runPlanned(p) {
+    var breaks = p.breaks
+    runLayout(p.argv, Presets.applyMoves(root.liveLayout, p.argv),
+              function(text) { return root.writeBreaksText(text, breaks) },
+              "The bar did not end up as planned. Use Undo to go back.")
   }
 
   function movePill(area, pillNumber, target) {
-    if (root.busy || !root.storeLoaded) return
+    if (root.busy || !root.storeLoaded || blockedByUnfinished()) return
     refreshLive()
     var p = plan(function() {
       return Presets.movePillPlan(root.liveLayout, root.storeData.groups.breaks, String(area), Number(pillNumber), String(target), root.layoutRoles())
@@ -581,23 +647,21 @@ Item {
     if (p.error) { root.layoutError = String(p.error); return }
     if (!p.argv || p.argv.length === 0) { root.layoutError = "Nothing to move: the pill is already there."; return }
     saveUndo("Moved a pill")
-    var breaks = p.breaks
-    runLayout(p.argv, function() {
-      if (breaks) commitText(PillStyle.patchStore(root.lastRawText, "groups", { breaks: breaks }))
-    })
+    runPlanned(p)
   }
 
+  // The record is cleared only once the bar is back at the saved layout.
   function undoLayout() {
     if (root.busy || !root.storeLoaded || !root.canUndo) return
     refreshLive()
     var undo = root.storeData.undo
     var p = plan(function() { return Presets.undoPlan(root.liveLayout, undo.layout) })
     if (p.error) { root.layoutError = String(p.error); return }
-    runLayout(p.argv, function() {
-      var text = PillStyle.writeStore(root.lastRawText, { undo: null })
-      if (undo.breaks) text = PillStyle.patchStore(text, "groups", { breaks: undo.breaks })
-      commitText(text)
-    })
+    if (p.argv.length > 0)
+      persistPatch({ undo: { layout: undo.layout, breaks: undo.breaks, label: undo.label, at: undo.at, running: true } })
+    runLayout(p.argv, undo.layout, function(text) {
+      return root.writeBreaksText(PillStyle.writeStore(text, { undo: null }), undo.breaks)
+    }, "Undo did not reach the saved layout. Try Undo again.")
   }
 
   // The live `bar` object from shell.json, a plain JSON copy. Re-read on
@@ -703,6 +767,8 @@ Item {
 
   function selectCategory(id) {
     root.categoryId = String(id)
+    root.layoutError = ""
+    checkUnfinished()
     root.cursorActive = false
     keyCatcher.forceActiveFocus()
   }
@@ -809,6 +875,7 @@ Item {
         if (root.layoutRun) {
           root.pending = []
           root.afterLayout = null
+          root.layoutWant = null
           root.layoutError = "Stopped after a failed step. Use Undo to go back."
         }
       }
@@ -832,10 +899,11 @@ Item {
       pruneRestoredStore()
       refreshLive()
       if (root.layoutRun) {
-        var after = root.afterLayout
+        var after = root.afterLayout, want = root.layoutWant
         root.layoutRun = false
         root.afterLayout = null
-        if (after) after()
+        root.layoutWant = null
+        root.endLayout(after, want, root.layoutMismatch)
       }
       // Widget names and clone sources change with what is enabled, and so
       // does which slots are drawing.

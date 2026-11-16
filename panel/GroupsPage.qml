@@ -185,7 +185,7 @@ Column {
               anchors.right: parent.right
               anchors.rightMargin: Style.space(8)
               anchors.verticalCenter: parent.verticalCenter
-              enabled: !band.modelData.repeat
+              enabled: !band.modelData.repeat && !page.panel.busy
               opacity: enabled ? 1 : 0.4
               checked: band.modelData.startsPill
               foreground: page.foreground
