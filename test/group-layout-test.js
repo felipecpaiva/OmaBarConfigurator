@@ -11,6 +11,14 @@ function run(left, breaks, opts, area) {
 var row = [S("a", 0, 10), S("b", 10, 20), S("c", 20, 30), S("d", 30, 40)]
 
 var tests = [
+  ["even: false keeps the full padding on an end with room", function () {
+    var slots = { left: [S("a", 0, 10), S("b", 10, 20)] }
+    var on = G.pills(slots, { left: ["b"] }, { padding: 8, gap: 4 }).left
+    var off = G.pills(slots, { left: ["b"] }, { padding: 8, gap: 4, even: false }).left
+    assert.deepStrictEqual([on[0].start, on[0].end], [2, 8], "even: the outer end matches the tight split end")
+    assert.deepStrictEqual([off[0].start, off[0].end], [-8, 8], "off: the outer end keeps 8")
+    assert.deepStrictEqual([off[1].start, off[1].end], [12, 28])
+  }],
   ["ink: padding counts from visible content, not the widget box", function () {
     // a: box 0-40, icon 2-38 (drawn at its edges); b: box 40-100, icon 60-80 (wide margins)
     var slots = { left: [{ id: "a", start: 0, end: 40, inkStart: 2, inkEnd: 38 }, { id: "b", start: 40, end: 100, inkStart: 60, inkEnd: 80 }] }

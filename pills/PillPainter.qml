@@ -76,7 +76,7 @@ BarWidget {
     var parent = located.parents[area]
     var extent = parent ? (vertical ? parent.height : parent.width) : Infinity
     var pills = GroupLayout.pills(areas, store.groups.breaks, {
-      padding: style.padding, gap: style.gap, min: style.inset, max: extent - style.inset,
+      padding: style.padding, gap: style.gap, min: style.inset, max: extent - style.inset, even: style.evenEnds,
       solo: store.groups.solo, noPill: store.groups.noPill, centerParts: store.groups.centerParts
     })[area]
     // Square edges: the outermost pill runs to the screen edge, in the parent's coordinates.
