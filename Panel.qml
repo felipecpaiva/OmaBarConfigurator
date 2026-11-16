@@ -10,6 +10,7 @@ import "Model.js" as Model
 import "lib/PillStyle.js" as PillStyle
 import "lib/Groups.js" as Groups
 import "lib/Presets.js" as Presets
+import "lib/PresetTargets.js" as PresetTargets
 
 // Bar widget picker: one row per widget on the bar, grouped by the section it
 // sits in, each with a switch for shown/hidden. A hidden widget keeps its row
@@ -152,6 +153,9 @@ Item {
       if (a.index !== b.index) return a.index - b.index
       return a.seq - b.seq
     })
+    // The section header rides on the first row of each region.
+    for (var j = 0; j < out.length; j++)
+      out[j].title = (j === 0 || out[j - 1].region !== out[j].region) ? regionLabel(out[j].region) : ""
     return out
   }
 
@@ -380,6 +384,10 @@ Item {
   property bool opened: false
   property int cursorIndex: 0
   property bool cursorActive: false
+  // Widget list scroll position, kept here so it survives the list's rebuilds
+  // and the page being reloaded. Emitted before a toggle so the page records it.
+  property real widgetKeepY: 0
+  signal toggleStarting()
 
   function open(payloadJson) {
     // No payload keys are defined yet; parse anyway so a caller passing one
@@ -393,7 +401,7 @@ Item {
     refreshGeometry()
     root.cursorActive = false
     root.cursorIndex = 0
-    widgetList.keepContentY = 0
+    root.widgetKeepY = 0
     root.opened = true
     setCenterHoverRevealSuppressed(true)
     // The surface is not mapped yet when open() runs, so a `focus: true`
@@ -553,17 +561,51 @@ Item {
 
   function layoutRoles() {
     var found = []
+    var ids = []
     var keys = ["left", "centerBegin", "center", "centerEnd", "right"]
     for (var k = 0; k < keys.length; k++) {
       var list = root.liveLayout[keys[k]] || []
       for (var i = 0; i < list.length; i++) {
         var e = list[i]
         var id = typeof e === "string" ? e : (e && e.id !== undefined ? String(e.id) : "")
-        if (id !== "" && found.indexOf(id) < 0 && root.isWorkspacesWidget(id)) found.push(id)
+        if (id === "" || ids.indexOf(id) >= 0) continue
+        ids.push(id)
+        if (root.isWorkspacesWidget(id)) found.push(id)
       }
     }
     // The resolved anchor, the one the rest of the panel shows and locks.
-    return { workspaces: found, selfId: Model.SELF_ID, centerAnchor: Model.centerAnchorId({ bar: root.liveBar }) }
+    var anchor = Model.centerAnchorId({ bar: root.liveBar })
+    var clocks = anchor !== "" ? [anchor] : ids.filter(function(x) {
+      return root.clonedFrom(x) === "omarchy.clock" || /clock$/.test(x)
+    })
+    var trays = ids.filter(function(x) { return root.clonedFrom(x) === "omarchy.tray" })
+    // aliases: a default-layout id -> the ids that play its role on this bar.
+    return { workspaces: found, selfId: Model.SELF_ID, centerAnchor: anchor, defaultLayout: root.defaultLayout,
+             aliases: { "omarchy.workspaces": found, "omarchy.clock": clocks, "omarchy.tray": trays } }
+  }
+
+  // Omarchy's own default bar.layout, for the "Omarchy default" preset. Read
+  // once when the host injects omarchyPath; null on any failure, so the preset
+  // refuses instead of guessing.
+  property var defaultLayout: null
+
+  FileView {
+    id: defaultsFile
+    path: root.omarchyPath !== "" ? root.omarchyPath + "/config/omarchy/shell.json" : ""
+    watchChanges: false
+    printErrors: false
+    onLoaded: root.loadDefaultLayout(text())
+    onLoadFailed: root.defaultLayout = null
+  }
+
+  function loadDefaultLayout(raw) {
+    try {
+      var parsed = JSON.parse(String(raw || "") || "{}")
+      root.defaultLayout = (parsed && parsed.bar && parsed.bar.layout) ? parsed.bar.layout : null
+    } catch (e) {
+      console.warn("oma-bar-configurator: Omarchy default layout unreadable:", e)
+      root.defaultLayout = null
+    }
   }
 
   // Saved before any command runs, so a run that fails halfway can still be undone.
@@ -635,7 +677,7 @@ Item {
     for (var i = 0; i < Presets.PRESETS.length; i++)
       if (Presets.PRESETS[i].id === label) label = Presets.PRESETS[i].label
     var p = plan(function() {
-      return Presets.presetPlan(root.liveLayout, String(id), root.layoutRoles(), root.storeData.groups.breaks)
+      return Presets.presetPlan(root.liveLayout, String(id), root.layoutRoles(), root.storeData.groups.breaks, PresetTargets)
     })
     if (p.error) { root.layoutError = String(p.error); return }
     if (!p.argv || p.argv.length === 0) { root.layoutError = "Nothing to move: the bar already looks like this."; return }
@@ -796,10 +838,11 @@ Item {
     selectCategory(categories[((at + delta) % n + n) % n].id)
   }
 
-  // panel/<Name>.qml for a named page, panel/SettingsPage.qml for a settings
-  // group. The name comes from a file, so it may only be a plain identifier.
+  // panel/<Name>.qml for a named page ("widgets" is panel/WidgetsPage.qml),
+  // panel/SettingsPage.qml for a settings group. The name comes from a file, so it may only be a plain identifier.
   function pageUrl(group) {
     var name = typeof group.page === "string" ? group.page : "SettingsPage"
+    if (name === "widgets") name = "WidgetsPage"
     if (!/^[A-Za-z][A-Za-z0-9]*$/.test(name)) {
       console.warn("oma-bar-configurator: bad page name in spec:", name)
       return ""
@@ -809,7 +852,7 @@ Item {
 
   function loadPage() {
     var group = root.currentGroup
-    if (!win.visible || !group || group.page === "widgets") { pageLoader.source = ""; return }
+    if (!win.visible || !group) { pageLoader.source = ""; return }
     var url = pageUrl(group)
     if (url === "") { pageLoader.source = ""; return }
     var props = typeof group.page === "string" ? { panel: root } : { panel: root, group: group }
@@ -966,9 +1009,9 @@ Item {
   function toggleAt(index) {
     var row = rowAt(index)
     if (!row || !root.storeLoaded || root.busy) return
-    // The list is about to be rebuilt out from under itself; remember where it
-    // was standing first. See widgetList.keepContentY.
-    widgetList.keepContentY = widgetList.contentY
+    // The list is about to be rebuilt out from under itself; the Widgets page
+    // records where it was standing first (panel/WidgetsPage.qml).
+    root.toggleStarting()
     if (row.visible) hideWidget(row)
     else showWidget(row)
   }
@@ -1086,6 +1129,8 @@ Item {
   // ---- window ----------------------------------------------------------
   readonly property int gap: Style.gapsOut
   readonly property real categoryBarExtent: root.categories.length > 1 ? categoryBar.height + content.spacing : 0
+  // Height a page may take before the card runs out of screen; pages size against it.
+  readonly property real pageRoom: win.availableHeight - card.verticalInset - root.categoryBarExtent
   readonly property int margin: Style.gapsOut
 
   PanelWindow {
@@ -1182,316 +1227,19 @@ Item {
         anchors.top: parent.top
         spacing: Style.space(12)
 
-        // The topic switcher: one equal-width chip per spec group, built like
-        // the bar position row so any number of topics fits the card. Hidden
-        // with one topic, so a spec-less install looks as before.
-        Row {
+        CategoryBar {
           id: categoryBar
           width: parent.width
-          visible: root.categories.length > 1
-          spacing: Style.space(6)
-
-          readonly property real cellWidth:
-            (width - spacing * Math.max(0, root.categories.length - 1)) / Math.max(1, root.categories.length)
-
-          Repeater {
-            model: root.categories
-
-            delegate: Button {
-              required property var modelData
-              width: categoryBar.cellWidth
-              text: String(modelData.title || modelData.id)
-              tooltipText: "Tab and Shift+Tab switch topics"
-              fontSize: Style.font.bodySmall
-              fontFamily: root.fontFamily
-              foreground: root.foreground
-              horizontalPadding: Style.spacing.controlPaddingX
-              verticalPadding: Style.spacing.controlPaddingY + Style.space(2)
-              bordered: true
-              active: root.currentGroup.id === modelData.id
-              onClicked: root.selectCategory(modelData.id)
-            }
-          }
+          panel: root
         }
 
-        // Everything above the list. Its height is independent of the list's,
-        // which is what lets the list cap itself against the space left over
-        // without the two forming a binding loop.
-        Column {
-          id: headBlock
-          visible: root.onWidgetsPage
-          width: parent.width
-          spacing: Style.space(12)
-
-          PanelHero {
-            title: "Bar widgets"
-            // The eyebrow must not restate the grid two rows below it: the
-            // section counts and the shown/hidden split are already there, and
-            // the bar position is on the button group. What is left, and what
-            // nothing else on the card says, is which widget the centre is
-            // pinned to. PanelHero upper-cases `meta` for us.
-            meta: root.busy
-              ? "APPLYING CHANGES"
-              : (root.anchorName !== ""
-                 ? "PINNED TO " + root.anchorName
-                 : "CENTRE UNPINNED")
-            foreground: root.foreground
-            fontFamily: root.fontFamily
-
-            iconComponent: Component {
-              Text {
-                textFormat: Text.PlainText
-                text: "󱍕"
-                color: root.foreground
-                font.family: root.fontFamily
-                font.pixelSize: Style.font.display
-              }
-            }
-
-            // The hero's trailing rail, which was empty: 28% of the card's
-            // width and 134px tall holding 133 lit pixels, while the reference
-            // puts its action glyphs and a master toggle there. These two are
-            // the bar-wide verbs this panel already owns. The restore is
-            // present always now rather than appearing only once something is
-            // hidden -- a control that is absent teaches nobody it exists --
-            // and the switch reports a real bar setting rather than decorating.
-            trailingControl: Component {
-              Row {
-                spacing: Style.space(8)
-
-                PanelActionButton {
-                  anchors.verticalCenter: parent.verticalCenter
-                  enabled: root.hiddenCount > 0 && !root.busy
-                  iconText: "󰈈"
-                  tooltipText: root.hiddenCount > 0
-                    ? "Show every hidden widget" : "Nothing is hidden"
-                  foreground: root.foreground
-                  fontFamily: root.fontFamily
-                  onClicked: root.restoreAll()
-                }
-
-                ToggleSwitch {
-                  anchors.verticalCenter: parent.verticalCenter
-                  checked: root.barTransparent
-                  busy: root.busy
-                  foreground: root.foreground
-                  onToggled: root.setBarTransparent(!root.barTransparent)
-                }
-              }
-            }
-          }
-
-          // Four counts, one or two characters each, forever. They were in a
-          // two-column right-aligned grid, which is the reference's shape but
-          // not the reference's DATA: its values are 5-13 characters stacked
-          // four deep, so its right axis accumulates into a column rule. Ours
-          // put a single digit 175px from its label, four times, and with two
-          // rows there was no axis to read. Fixed where the mismatch is -- the
-          // values -- rather than by padding the grid with invented stats.
-          //
-          // One row of tight label+value pairs on four evenly spaced starts:
-          // the number sits against the word it belongs to, the four cell
-          // starts are the alignment, and the block gives a line of height
-          // back to the head.
-          Row {
-            id: statRow
-            width: parent.width
-            spacing: Style.space(6)
-
-            readonly property real cellWidth: (width - spacing * 3) / 4
-
-            StatCell { label: "Left"; value: root.regionCount("left") }
-            StatCell {
-              label: "Center"
-              value: root.regionCount("centerBegin") + root.regionCount("center") + root.regionCount("centerEnd")
-            }
-            StatCell { label: "Right"; value: root.regionCount("right") }
-            StatCell {
-              label: "Hidden"
-              value: root.hiddenCount
-              valueColor: root.hiddenCount > 0 ? root.foreground : root.dim
-            }
-          }
-
-          PanelSeparator { foreground: root.foreground }
-
-          // The head's only control, on the axis the title row leaves empty.
-          // `omarchy bar position <top|bottom|left|right>` is a supported verb
-          // and it is the one bar-wide decision this card can honestly own --
-          // everything below it is per-widget.
-          Column {
-            width: parent.width
-            spacing: Style.space(4)
-
-            PanelSectionHeader {
-              text: "BAR POSITION"
-              // Same construction as the list's section headers so this one
-              // binds downward by the same amount: overshoot guard, plus the
-              // gap that separates it from what came before.
-              topPadding: Math.ceil(fontSize * 0.15) + Style.space(8)
-              foreground: root.foreground
-              fontFamily: root.fontFamily
-            }
-
-            Row {
-              id: positionRow
-              width: parent.width
-              spacing: Style.space(6)
-
-              readonly property real cellWidth: (width - spacing * 3) / 4
-
-              Repeater {
-                model: ["top", "right", "bottom", "left"]
-
-                delegate: Button {
-                  required property string modelData
-                  width: positionRow.cellWidth
-                  text: modelData.charAt(0).toUpperCase() + modelData.slice(1)
-                  tooltipText: "Move the bar to the " + modelData
-                  fontSize: Style.font.bodySmall
-                  fontFamily: root.fontFamily
-                  foreground: root.foreground
-                  horizontalPadding: Style.spacing.controlPaddingX
-                  verticalPadding: Style.spacing.controlPaddingY + Style.space(2)
-                  bordered: true
-                  active: root.barPosition === modelData
-                  enabled: !root.busy
-                  onClicked: root.setBarPosition(modelData)
-                }
-              }
-            }
-          }
-
-          PanelSeparator { foreground: root.foreground }
-        }
-
-        // One flat list across all three sections: the section header rides on
-        // the first row of each region, the way the network panel heads its
-        // known / other groups. ListView rather than a Repeater so
-        // positionViewAtIndex keeps the keyboard cursor on screen once the
-        // list outgrows the card.
-        ListView {
-          id: widgetList
-          visible: root.onWidgetsPage
-          width: parent.width
-          // Two caps. The screen one is the hard limit; the second keeps a bar
-          // with a lot of widgets from growing a card the height of the
-          // display -- past that the list scrolls. It was 420, which sliced
-          // this machine's own bar four rows early while the screen still had
-          // the room for them.
-          readonly property real capHeight: Math.min(contentHeight, Style.space(560),
-            Math.max(Style.space(120),
-              win.availableHeight - card.verticalInset - headBlock.implicitHeight - content.spacing
-                - root.categoryBarExtent))
-
-          // Whatever the caps land on, the viewport ends on a row boundary. A
-          // row cut through its own middle reads as a clipping bug, not as
-          // "there is more below" -- and the scrollbar is already saying the
-          // second part. Assigned, never bound: `capHeight` is a function of
-          // contentHeight and the screen, neither of which depends on the
-          // viewport, so nothing here can feed back into itself.
-          property real snappedHeight: 0
-          height: snappedHeight > 0 ? snappedHeight : capHeight
-
-          // `model` is a plain JS array, so every rebuild REPLACES it and a
-          // ListView puts a replaced model back at the top. One toggle rebuilds
-          // it twice -- once when our own store changes, again when the host's
-          // config catches up -- so hiding three widgets in a row used to throw
-          // the user back to the top of a fifteen-row list twice.
-          //
-          // toggleAt records the position before it dispatches; every rebuild
-          // after that puts it back. Assigned late (Qt.callLater) because the
-          // delegates and contentHeight are not settled inside the model change
-          // itself, and there is nothing to clamp against yet.
-          property real keepContentY: 0
-          onModelChanged: Qt.callLater(restoreContentY)
-          onMovementEnded: keepContentY = contentY
-
-          function restoreContentY() {
-            var wanted = Math.max(0, Math.min(keepContentY, Math.max(0, contentHeight - height)))
-            if (Math.abs(contentY - wanted) > 0.5) contentY = wanted
-          }
-
-          // Snapping changes `height`, which re-clamps contentY, so the wanted
-          // position is re-applied after it rather than before.
-          onCapHeightChanged: Qt.callLater(resnapAndKeepPosition)
-          onCountChanged: Qt.callLater(resnapAndKeepPosition)
-
-          function resnapAndKeepPosition() { resnap(); restoreContentY() }
-
-          function resnap() {
-            if (capHeight >= contentHeight) { snappedHeight = 0; return }
-            // The delegate straddling the cut. -1 means the cut already fell in
-            // the gap between two rows, which is the thing we are aiming for.
-            var i = indexAt(2, contentY + capHeight)
-            if (i < 0) { snappedHeight = 0; return }
-            var item = itemAtIndex(i)
-            var top = item ? item.y - contentY : 0
-            snappedHeight = top >= Style.space(120) ? top : 0
-          }
-          spacing: Style.space(2)
-          clip: true
-          boundsBehavior: Flickable.StopAtBounds
-          interactive: contentHeight > height
-
-          ScrollBar.vertical: ScrollBar { policy: ScrollBar.AsNeeded }
-
-          model: root.rows
-          currentIndex: root.cursorIndex
-          onCurrentIndexChanged: if (currentIndex >= 0) positionViewAtIndex(currentIndex, ListView.Contain)
-
-          // The delegate context does not reach into a nested `component`
-          // declaration, so the wrapper takes the required props and hands
-          // them down explicitly.
-          delegate: Item {
-            required property var modelData
-            required property int index
-
-            readonly property string sectionTitle: {
-              if (index === 0) return root.regionLabel(modelData.region)
-              var prev = root.rows[index - 1]
-              return (prev && prev.region === modelData.region)
-                ? "" : root.regionLabel(modelData.region)
-            }
-
-            width: ListView.view.width
-            height: delegateColumn.implicitHeight
-
-            Column {
-              id: delegateColumn
-              width: parent.width
-              spacing: Style.space(4)
-
-              PanelSectionHeader {
-                visible: sectionTitle !== ""
-                // The base topPadding protects the Nerd Font overshoot from the
-                // list's clip; the rest is the gap between one section and the
-                // last row of the previous one.
-                topPadding: Math.ceil(fontSize * 0.15) + (index === 0 ? 0 : Style.space(8))
-                height: visible ? implicitHeight : 0
-                text: sectionTitle
-                foreground: root.foreground
-                fontFamily: root.fontFamily
-              }
-
-              WidgetRow {
-                width: parent.width
-                row: modelData
-                rowIndex: parent.parent.index
-              }
-            }
-          }
-        }
-
-        // Every topic other than Widgets. The page takes its natural height;
+        // Every topic, Widgets included. The page takes its natural height;
         // past what the card has left, it scrolls here, so pages need not.
         Flickable {
           id: pageScroll
-          visible: !root.onWidgetsPage
           width: parent.width
           contentHeight: pageLoader.height
-          height: Math.min(contentHeight,
-            Math.max(Style.space(120), win.availableHeight - card.verticalInset - root.categoryBarExtent))
+          height: Math.min(contentHeight, Math.max(Style.space(120), root.pageRoom))
           clip: true
           boundsBehavior: Flickable.StopAtBounds
           interactive: contentHeight > height
@@ -1508,186 +1256,5 @@ Item {
       }
       }
     }
-  }
-
-  // One widget on the bar. Glyph, name, and a switch the row itself owns --
-  // the switch is presentation, so the whole row is a single target for the
-  // mouse and the keyboard cursor alike.
-  component WidgetRow: CursorSurface {
-    id: widgetRow
-    required property var row
-    required property int rowIndex
-
-    readonly property bool shown: row.visible
-    readonly property bool locked: root.isLocked(row)
-    // On the bar and painting nothing. Its own truth, separate from `shown`:
-    // the entry is there, the widget just has nothing to draw.
-    readonly property bool blank: row.visible && root.notDrawingIds[row.id] === true
-
-    hasCursor: root.cursorActive && root.cursorIndex === rowIndex
-    // The raised fill is the anchor row's and nothing else on the list spends
-    // it -- the same slot the network panel keeps for the network it is
-    // connected to. Every other row sits on the popup ground. The band that
-    // used to run under all of them measured 1.05:1 against that ground: 41.5%
-    // of the card for a difference nothing can see, and it held the one fill
-    // the anchor needed, which is why the anchor then wanted a rule AND a tag
-    // before it could be found. CursorSurface already draws exactly this; the
-    // explicit `color` that used to sit here was overriding it.
-    current: widgetRow.locked
-    foreground: root.foreground
-    fill: root.hoverFill
-    currentFill: root.selectedFill
-    implicitHeight: rowBody.implicitHeight
-
-    // Never dim the anchor row. It is pinned, not broken, and the dimmed
-    // version read as a widget that had failed rather than one deliberately
-    // held on. Only a command in flight dims anything.
-    opacity: root.busy ? 0.6 : 1.0
-
-    MouseArea {
-      id: rowMouse
-      anchors.fill: parent
-      hoverEnabled: true
-      acceptedButtons: Qt.LeftButton
-      cursorShape: widgetRow.locked ? Qt.ArrowCursor : Qt.PointingHandCursor
-
-      // Entering moves the cursor here; leaving does not clear it, so j/k
-      // picks up from wherever the mouse last was.
-      onContainsMouseChanged: if (containsMouse) {
-        root.cursorActive = true
-        root.cursorIndex = widgetRow.rowIndex
-      }
-      onClicked: root.toggleAt(widgetRow.rowIndex)
-    }
-
-    PanelToolTip {
-      visible: widgetRow.locked && rowMouse.containsMouse
-      text: "The centre section is pinned to this widget"
-      fontFamily: root.fontFamily
-    }
-
-    Item {
-      id: rowBody
-      anchors.left: parent.left
-      anchors.right: parent.right
-      anchors.top: parent.top
-      anchors.leftMargin: Style.space(10)
-      // Not the left margin's 10. The switch is the only thing anchored to this
-      // edge, and the kit's header switch sits 6 inside the same rail (its
-      // cursor-ring pad), so 6 here puts all fourteen switches on one axis
-      // instead of leaving the thirteen list ones 4px short of it.
-      anchors.rightMargin: Style.space(6)
-      implicitHeight: Math.max(rowGlyph.height, rowLabel.implicitHeight, rowSwitch.implicitHeight)
-        + Style.spacing.rowPaddingX
-
-      OpticalGlyph {
-        id: rowGlyph
-        width: Style.space(18)
-        height: Style.space(18)
-        anchors.left: parent.left
-        anchors.verticalCenter: parent.verticalCenter
-        text: root.widgetGlyph(widgetRow.row.id)
-        fontFamily: root.widgetGlyphFamily(widgetRow.row.id)
-        fontSize: Style.font.title
-        color: widgetRow.shown ? root.foreground : root.dim
-      }
-
-      // The kit's switch, unmodified, exactly as `Toggle` parks it at the end
-      // of a labeled row: `interactive: false` hands the click to the row's own
-      // MouseArea and drops the cursor ring, so the item is the track and
-      // nothing else and its right edge lands on the header switch's axis.
-      //
-      // This replaces an inlined copy that dimmed the ON knob to the sub-label
-      // tier, out of a fear that thirteen knobs at full foreground would shout.
-      // That inverted the semantics: the OFF knob came out brighter than the ON
-      // one, so the rail read as thirteen disabled controls with the single
-      // genuinely-off switch the loudest thing in it. The kit has it the right
-      // way round -- ON takes the title token, the same value the reference
-      // card spends on its one ON switch, and OFF drops a tier and picks up the
-      // 1px border this card already gives every inactive segmented button.
-      // Fourteen switches, one rule, and the state reads in the right
-      // direction.
-      ToggleSwitch {
-        id: rowSwitch
-        anchors.right: parent.right
-        anchors.verticalCenter: parent.verticalCenter
-        checked: widgetRow.shown
-        interactive: false
-        foreground: root.foreground
-      }
-
-      // Trailing state marker, the slot the network panel keeps for its row
-      // state. Sentence case, unbolded, untracked -- deliberately NOT the
-      // small-caps of the LEFT / CENTER / RIGHT headers, which is what the
-      // bolded and tracked "ANCHOR" was colliding with: a row-level fact drawn
-      // at group-level rank. The reference writes "Connected" in this slot,
-      // not "CONNECTED", for the same reason.
-      //
-      // "Not drawing" rides here too, at the same tier and in the same token:
-      // it is a row-level fact, and it is information, not an alarm. Both can
-      // be true at once, so both get said rather than one hiding the other.
-      Text {
-        id: rowState
-        textFormat: Text.PlainText
-        visible: text !== ""
-        text: widgetRow.locked
-          ? (widgetRow.blank ? "Pinned, not drawing" : "Pinned")
-          : (widgetRow.blank ? "Not drawing" : "")
-        anchors.right: rowSwitch.left
-        anchors.rightMargin: Style.space(10)
-        anchors.verticalCenter: parent.verticalCenter
-        color: root.dim
-        font.family: root.fontFamily
-        font.pixelSize: Style.font.caption
-      }
-
-      // One line, always. A second line under the name is what made the anchor
-      // row 4px taller than its neighbours and put a visible stumble in the
-      // list's pitch; the state it carried now rides beside the switch.
-      Text {
-        id: rowLabel
-        textFormat: Text.PlainText
-        anchors.left: rowGlyph.right
-        anchors.leftMargin: Style.space(10)
-        anchors.right: rowState.visible ? rowState.left : rowSwitch.left
-        anchors.rightMargin: Style.space(10)
-        anchors.verticalCenter: parent.verticalCenter
-        text: root.widgetName(widgetRow.row.id)
-        color: widgetRow.shown ? root.foreground : root.dim
-        font.family: root.fontFamily
-        font.pixelSize: Style.font.body
-        elide: Text.ElideRight
-      }
-    }
-  }
-
-  // One count and the word it counts, kept together. `parent` is the stat row,
-  // which owns the cell width -- an inline component cannot see an id declared
-  // inside the tree below root.
-  component StatCell: Row {
-    property string label: ""
-    property string value: ""
-    property color valueColor: root.foreground
-
-    width: parent ? parent.cellWidth : 0
-    spacing: Style.space(6)
-
-    InfoLabel { text: parent.label }
-    InfoValue { text: parent.value; color: parent.valueColor }
-  }
-
-  component InfoLabel: Text {
-    textFormat: Text.PlainText
-    color: root.foreground
-    opacity: 0.6
-    font.family: root.fontFamily
-    font.pixelSize: Style.font.bodySmall
-  }
-
-  component InfoValue: Text {
-    textFormat: Text.PlainText
-    color: root.foreground
-    font.family: root.fontFamily
-    font.pixelSize: Style.font.bodySmall
   }
 }
