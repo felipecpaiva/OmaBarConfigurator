@@ -174,6 +174,11 @@ try {
   var slot = it({ width: 100 }, [hover, it({ x: 5 }, [text, img]), hidden])
   assert.deepStrictEqual(A.inkSpan(slot, false), { lo: 20, hi: 70 })
   assert.strictEqual(A.inkSpan(it({ width: 10 }, [hover]), false), null)
+  // A tile narrower than the slot counts; a transparent one does not.
+  var tile = it({ x: 2, width: 90, color: { a: 0.3 }, radius: 4 })
+  assert.deepStrictEqual(A.inkSpan(it({ width: 100 }, [tile, text]), false), { lo: 2, hi: 92 })
+  var clear = it({ x: 2, width: 90, color: { a: 0 }, radius: 4 })
+  assert.deepStrictEqual(A.inkSpan(it({ width: 100 }, [clear, text]), false), { lo: 15, hi: 35 })
 })()
 
 console.log("OK bar-adapter")

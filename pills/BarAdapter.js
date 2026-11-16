@@ -130,8 +130,8 @@ function offsetIn(item, ancestor, vertical) {
 var ALIGN = { h: { end: 2, center: 4 }, v: { end: 64, center: 128 } }
 
 // The visible content of one slot along the bar axis, in the slot's coordinates: the union
-// of visible Text and Image items (glyphs, labels, icons). Rectangles are skipped on
-// purpose: hover fills come and go, and the span must not jump on hover. null when
+// of visible Text and Image items (glyphs, labels, icons) and filled boxes narrower than the
+// slot (a tile behind content). Full-width boxes (hover fills) are skipped. null when
 // nothing is found, and the slot's box is used. Reading the items makes the calling
 // binding re-run when any of them changes.
 function inkSpan(slot, vertical) {
@@ -176,9 +176,14 @@ function inkSpan(slot, vertical) {
       add(pos + (len - pw) / 2, pos + (len + pw) / 2) // images draw centred (PreserveAspectFit)
       return
     }
+    // A filled box smaller than the slot, such as the active workspace tile, is drawn content:
+    // the pill must cover it. A box as wide as the slot is a hover fill or a frame and is skipped,
+    // so hovering a widget never moves its pill.
+    if ("radius" in it && it.color && it.color.a > 0.02 && len > 0 && len < full - 1) add(pos, pos + len)
     var kids = it.children
     if (kids) for (var i = 0; i < kids.length; i++) walk(kids[i], pos, depth + 1)
   }
+  var full = slot ? (vertical ? slot.height : slot.width) : 0
   var kids = slot ? slot.children : null
   if (kids) for (var i = 0; i < kids.length; i++) walk(kids[i], 0, 0)
   return hi > lo ? { lo: lo, hi: hi } : null
