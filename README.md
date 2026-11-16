@@ -92,7 +92,7 @@ It reverses the install and nothing more:
 | `~/.local/share/applications/omabarconfigurator.desktop` | deleted **only** if it carries `X-OmaBarConfigurator-Managed=true` |
 | `~/.config/omarchy/oma-bar-configurator.json` | left in place, so a reinstall still knows where your hidden widgets came from |
 
-Your `bar.layout` is not touched. Anything you hid stays hidden — turn it back
+Your `bar.layout` is not touched. Anything you hid stays hidden. Turn it back
 on in the panel first if you want the bar restored before removing the plugin.
 A `.bak` the installer made from a desktop entry it did not write is left alone.
 
@@ -100,7 +100,7 @@ A `.bak` the installer made from a desktop entry it did not write is left alone.
 
 - **Omarchy** with the Quickshell desktop running. Check with
   `omarchy-shell shell ping`, which answers `ok`.
-- **`jq`** — used by `install.sh` to poll the plugin registry. Already a
+- **`jq`**, used by `install.sh` to poll the plugin registry. Already a
   dependency of Omarchy's own plugin CLI, so it is present on any Omarchy box.
 - Omarchy's own commands: `omarchy plugin enable/disable/validate`,
   `omarchy bar`, `omarchy-shell`, `omarchy-plugin-list`.
@@ -112,7 +112,7 @@ runtime beyond what the shell already provides.
 
 MIT, see [LICENSE](LICENSE).
 
-The panel is built from Omarchy's own `qs.Ui` and `qs.Commons` components —
+The panel is built from Omarchy's own `qs.Ui` and `qs.Commons` components,
 `Panel`, `PanelHero`, `PanelSectionHeader`, `ToggleSwitch`, `CursorSurface` and
 friends. They are **imported at runtime, not vendored**: no Omarchy source is
 copied into this repository. Omarchy is MIT-licensed by 37signals.

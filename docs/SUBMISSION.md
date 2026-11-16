@@ -26,7 +26,7 @@ The nine options are Appearance, Desktop, Developer Tools, Hardware, Kids, Produ
 Widgets, Other. `Widgets` is the near-miss: it reads as "this plugin *is* a widget", and this one is
 a panel that configures other widgets. What the user changes is how their bar looks, so Appearance.
 
-## Tags — pick exactly three
+## Tags: pick exactly three
 
 **`Bar`**, **`Quickshell`**, **`System`**
 
@@ -39,7 +39,7 @@ does not narrow anything for someone browsing.
 
 ## Maintainer notes
 
-Paste this into the form's *Maintainer notes* field. It is short on purpose — the
+Paste this into the form's *Maintainer notes* field. It is short on purpose, the
 accepted listings run 4 to 10 lines, lead with what the plugin is, name what it
 writes, and finish with validation evidence. Implementation detail belongs in the
 README, not here.
@@ -51,7 +51,7 @@ README, not here.
 > `kinds: ["panel"]` with no bar widget, so it never takes a slot on the bar it
 > configures. It installs a desktop entry and opens from Super+Space → Apps.
 >
-> **Writes:** three paths, all listed in the README — its own plugin directory,
+> **Writes:** three paths, all listed in the README, its own plugin directory,
 > its own hidden-widget store at `~/.config/omarchy/oma-bar-configurator.json`,
 > and one desktop entry carrying `X-OmaBarConfigurator-Managed=true`. An existing
 > entry at that path that it did not write is backed up, never overwritten.
@@ -65,7 +65,7 @@ README, not here.
 > external command and Omarchy's own plugin CLI already requires it.
 >
 > Validated at commit `36eb39d` with `omarchy plugin validate` (exit 0) and 36
-> unit tests. New listing, not a duplicate — this repository has not been
+> unit tests. New listing, not a duplicate, this repository has not been
 > submitted before.
 
 ---
@@ -103,7 +103,7 @@ validates listings, not plugin security. Plugins run unsandboxed."*
 
 ---
 
-## Submission checklist — how each one is covered
+## Submission checklist: how each one is covered
 
 The form makes all five required. None is a formality; here is what backs each.
 
@@ -115,14 +115,14 @@ every path touched.
 **I have documented the plugin license and any external dependencies.**
 `LICENSE` is MIT. README `## License and credits` states it and records that
 Omarchy's `qs.Ui` / `qs.Commons` components are **imported at runtime, not
-vendored** — no Omarchy source is copied into the repo. README
+vendored**, no Omarchy source is copied into the repo. README
 `## Requirements and dependencies` lists the only external command, `jq`, which
 Omarchy's own plugin CLI already requires. No bundled libraries, no network
 access, no build step.
 
 **I confirm that I own or have permission to submit this plugin and its preview assets.**
 All code is original. The two screenshots in `docs/shots/` were taken on the
-author's own machine and cropped to the panel and the bar — no desktop, terminal
+author's own machine and cropped to the panel and the bar, no desktop, terminal
 or third-party content in frame.
 
 **The plugin does not overwrite user configuration without explicit consent.**
@@ -136,7 +136,7 @@ The strongest of the five, and worth reading in full rather than ticking:
   `omarchy plugin enable/disable` and `omarchy bar`, so the file is only ever
   written by Omarchy's own tooling.
 - Changing the bar is the user's own click, one widget at a time. There is no
-  bulk action that runs unprompted, and no reset-to-defaults button — that was
+  bulk action that runs unprompted, and no reset-to-defaults button, that was
   considered for the header and rejected, because `omarchy bar defaults` wipes
   the whole layout and should not sit one unconfirmed click away.
 - Hiding a widget stores its slot **and its inline settings** so restoring

@@ -1,0 +1,12 @@
+{
+  "schemaVersion": 1,
+  "id": "io.github.felipecpaiva.omabarspike",
+  "name": "OmaBar spike",
+  "version": "0.0.1",
+  "author": "felipecpaiva",
+  "description": "Throwaway spike: one hidden painter draws a pill behind each bar section.",
+  "license": "MIT",
+  "kinds": ["bar-widget"],
+  "entryPoints": { "barWidget": "Painter.qml" },
+  "barWidget": { "displayName": "OmaBar spike", "description": "spike", "category": "Layout", "allowMultiple": false, "defaultSection": "right" }
+}

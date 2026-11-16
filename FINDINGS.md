@@ -1,4 +1,4 @@
-# Verified constraints — read before writing code
+# Verified constraints: read before writing code
 
 Established by experiment on 2026-09-08, not assumed. Do not re-litigate these; if you think one is
 wrong, prove it with a command and say so.
@@ -31,11 +31,11 @@ shell.json write.
 
 ## Disable DISCARDS the entry, so inline settings are lost
 
-`PluginRegistry.qml:556` is `config.bar.layout[section].splice(index, 1)` — the entry object goes
+`PluginRegistry.qml:556` is `config.bar.layout[section].splice(index, 1)`, the entry object goes
 with it. Nothing stores it. Observed live: re-enabling `google-calendar.clock` brought it back
 showing its alternate format, because its inline `format` never survived the splice.
 
-**Consequence:** hiding must persist the whole entry — `{id, section, index, ...inline settings}` —
+**Consequence:** hiding must persist the whole entry, `{id, section, index, ...inline settings}`,
 in our own plugin settings, and restore it verbatim. Persisting only the id is a data-loss bug.
 Widgets that carry real inline state today include `felipe.tray` (`pinned`, `hidden`,
 `alwaysShow`), the clock (`format`, `formatAlt`, `verticalFormat`) and `omarchy.indicators`.
@@ -69,7 +69,7 @@ omarchy-restart-shell                                                   # hot re
 
 **Correction (verified 2026-09-08):** `omarchy-shell call <plugin-id> ...` fails because the
 plugin is the ARGUMENT, not the target. The working form is `omarchy-shell shell summon <id>`
-/ `hide <id>` / `toggle <id>` — target `shell`, method `summon`. Proven live:
+/ `hide <id>` / `toggle <id>`, target `shell`, method `summon`. Proven live:
 `omarchy-shell shell summon omarchy.wifiqr` returns `ok`. `qs ... ipc call <id> open` also works
 for widgets that register their own IPC target; both are valid, for different things.
 Export `HYPRLAND_INSTANCE_SIGNATURE` and `WAYLAND_DISPLAY=wayland-1` first, and run these with the
@@ -99,7 +99,7 @@ root cause of the complaint that started this work, and it is why our manifest d
 ## The Applications list is fed by desktop entries, not the menu extension
 
 `omarchy-menu.jsonc:24` marks `apps` as `"provider":"apps"`; `Menu.qml:287-293` fills it from the
-shared AppLibrary; `AppLibrary.qml:53` reads `DesktopEntries.applications` — the XDG scan of
+shared AppLibrary; `AppLibrary.qml:53` reads `DesktopEntries.applications`, the XDG scan of
 `~/.local/share/applications`. A JSONC row parented under `apps` is a different mechanism: static,
 routable by `omarchy menu summon`, but carrying no app icon or launch feedback. Desktop entries are
 the opposite: real app rows, never routable.
@@ -112,7 +112,7 @@ plugin, ships `~/.local/share/applications/omaland.desktop` with
 
 Reported by the panel builder, 2026-09-08, after it cost a debugging cycle. `shell.barConfig` has
 the right content and indexes fine, but `Model.sectionEntries` read every section as empty, so the
-panel rendered a hero over an empty list — **with no error anywhere**. The arrays arrive as
+panel rendered a hero over an empty list, **with no error anywhere**. The arrays arrive as
 QML/JS-engine objects that fail `Array.isArray`.
 
 Fix applied in `Panel.qml`: `JSON.parse(JSON.stringify(shell.barConfig))` before handing it to
