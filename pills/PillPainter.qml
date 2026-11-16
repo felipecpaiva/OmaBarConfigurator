@@ -75,7 +75,6 @@ BarWidget {
     areas[area] = BarAdapter.areaSlots(located, area, vertical)
     var parent = located.parents[area]
     var extent = parent ? (vertical ? parent.height : parent.width) : Infinity
-    console.info("OmaBar ink " + area + " " + JSON.stringify(areas[area].map(function(s) { return [s.id.split(".").pop(), Math.round(s.start), Math.round(s.end), Math.round(s.inkStart), Math.round(s.inkEnd)] })))
     var pills = GroupLayout.pills(areas, store.groups.breaks, {
       padding: style.padding, gap: style.gap, min: style.inset, max: extent - style.inset, even: false, // an end with room keeps full padding (Felipe, 2026-11-16)
       solo: store.groups.solo, noPill: store.groups.noPill, centerParts: store.groups.centerParts
