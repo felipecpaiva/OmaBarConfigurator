@@ -196,6 +196,23 @@ function inkSpan(slot, vertical) {
 
 // Slots of one area as fresh JS arrays, all in the coordinate space of the
 // area's pill parent: [{ id, start, end }] (center slots also carry part). Input for GroupLayout.pills.
+// Reads what areaSlots reads about positions and sizes, without measuring ink, and returns a
+// throwaway number. The painter's cheap binding calls it so any move or resize schedules one
+// recompute per frame (Qt.callLater), however many slots shift in that frame.
+function touch(located, area, vertical) {
+  var n = 0
+  if (!located) return n
+  var parent = located.parents[area], lists = located.areas[area]
+  if (!parent || !lists) return n
+  n += vertical ? parent.height : parent.width
+  for (var i = 0; i < lists.length; i++) {
+    var slots = slotsOf(lists[i], vertical)
+    for (var j = 0; j < slots.length; j++)
+      n += offsetIn(slots[j], parent, vertical) + slots[j].width + slots[j].height
+  }
+  return n
+}
+
 // cache: a Map from slot to its last measure. A slot is walked again only when its size
 // changes, so a widget animating its width costs one walk per frame, not the whole area's.
 function areaSlots(located, area, vertical, cache) {
@@ -235,6 +252,7 @@ if (typeof module !== "undefined") {
     slotId: slotId,
     offsetIn: offsetIn,
     areaSlots: areaSlots,
+    touch: touch,
     inkSpan: inkSpan
   }
 }

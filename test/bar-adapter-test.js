@@ -112,6 +112,17 @@ assert.deepStrictEqual(A.areaSlots(loc, "right", false).map(function (s) { retur
   assert.strictEqual(cache.size, n, "nothing measured twice")
   assert.strictEqual(JSON.stringify(A.areaSlots(loc, "center", false)), first, "same result without a cache")
 })()
+
+// touch: a number that reads every slot position and size; a resize changes it.
+;(function () {
+  var a = A.touch(loc, "center", false)
+  assert.ok(isFinite(a) && a > 0)
+  var lists = loc.areas.center, slot = A.slotsOf(lists[0], false)[0]
+  slot.width += 7
+  assert.notStrictEqual(A.touch(loc, "center", false), a)
+  slot.width -= 7
+  assert.strictEqual(A.touch(null, "center", false), 0)
+})()
 assert.deepStrictEqual(A.areaSlots(null, "left", false), [])
 
 // Vertical bar: the axis is y and height.

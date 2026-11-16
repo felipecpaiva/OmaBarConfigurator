@@ -63,10 +63,26 @@ BarWidget {
     fadeCurve: Style.easeOut
   })
 
-  // One binding per area: a change in one section recomputes only that area.
-  readonly property var leftPills: pillsOf("left")
-  readonly property var centerPills: pillsOf("center")
-  readonly property var rightPills: pillsOf("right")
+  // When a widget resizes, every slot after it moves too, and each move notified a binding that
+  // recomputed the whole area: about 65 recomputes a frame during a workspace switch (measured).
+  // Now a cheap binding per area only watches positions, sizes and settings, and schedules one
+  // recompute; Qt.callLater runs it once per event loop turn, however many slots moved.
+  property var leftPills: []
+  property var centerPills: []
+  property var rightPills: []
+  readonly property real leftTick: tick("left", recomputeLeft)
+  readonly property real centerTick: tick("center", recomputeCenter)
+  readonly property real rightTick: tick("right", recomputeRight)
+  function tick(area, recompute) {
+    var n = BarAdapter.touch(located, area, vertical)
+    // The settings the pills depend on, read here so a change schedules a recompute too.
+    var g = store.groups, s = style
+    Qt.callLater(recompute)
+    return n + (g ? 1 : 0) + (s ? 1 : 0)
+  }
+  function recomputeLeft() { leftPills = pillsOf("left") }
+  function recomputeCenter() { centerPills = pillsOf("center") }
+  function recomputeRight() { rightPills = pillsOf("right") }
 
   // Created pills per area. They live under the bar's own items, not under
   // this widget, so they are destroyed by hand (spike finding).
@@ -170,7 +186,6 @@ BarWidget {
   onCenterPillsChanged: syncArea("center", centerPills)
   onRightPillsChanged: syncArea("right", rightPills)
   onLookChanged: restyle()
-  onStyleChanged: { syncArea("left", leftPills); syncArea("right", rightPills) }
   Component.onCompleted: Qt.callLater(scan)
   Component.onDestruction: { clearArea("left"); clearArea("center"); clearArea("right") }
 
