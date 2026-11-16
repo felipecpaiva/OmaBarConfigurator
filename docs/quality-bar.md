@@ -16,7 +16,7 @@ Reference: Denial's bar (sizes in [plan.md](plan.md), Decisions). Islands Bar an
 competitors to match or beat.
 
 - [ ] Pills use the default sizes exactly: fully round ends, 12 px inner padding for unsplit pills,
-  4 px gap, 5 px space above and below. Measured on a screenshot, tolerance 1 px.
+  4 px gap, 3 px space above and below. Measured on a screenshot, tolerance 1 px.
 - [ ] Every pill has the same space at both ends, within 1 px, measured on a screenshot.
 - [ ] Pill edges sit on whole pixels at scale 1 and at the machine's own scale. No blurry edges.
 - [ ] Each widget sits centered across the pill's height, within 1 px.
