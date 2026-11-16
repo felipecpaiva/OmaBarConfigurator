@@ -1,4 +1,4 @@
-# OmaBar Configurator
+# OmaBar
 
 Show, hide and reorder the widgets on your Omarchy bar from one panel.
 
@@ -7,7 +7,7 @@ pick a bar section and does not add a fifteenth icon to the bar. It lands in
 the **Applications** list instead, next to your other apps.
 
 ```
-Super+Space -> Apps -> OmaBar Configurator
+Super+Space -> Apps -> OmaBar
 ```
 
 ## Install
@@ -65,7 +65,7 @@ submenu, which survives `omarchy update`:
 
 ```jsonc
 // ~/.config/omarchy/extensions/omarchy-menu.jsonc
-"apps.bar-configurator": {"icon":"󰍜","label":"OmaBar Configurator","action":"omarchy-shell shell toggle io.github.felipecpaiva.omabarconfigurator"},
+"apps.bar-configurator": {"icon":"󰍜","label":"OmaBar","action":"omarchy-shell shell toggle io.github.felipecpaiva.omabarconfigurator"},
 ```
 
 Static children of `apps` survive every re-run of the apps provider, which

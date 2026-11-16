@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "id": "io.github.felipecpaiva.omabarconfigurator",
-  "name": "OmaBar Configurator",
+  "name": "OmaBar",
   "version": "0.1.0",
   "author": "felipecpaiva",
   "description": "Show, hide and reorder Omarchy bar widgets from one panel. Launches from the Applications list. Its one bar entry is invisible and draws optional pills behind your widgets.",

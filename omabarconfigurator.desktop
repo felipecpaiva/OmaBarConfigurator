@@ -1,6 +1,6 @@
 [Desktop Entry]
 Type=Application
-Name=OmaBar Configurator
+Name=OmaBar
 GenericName=Omarchy Bar Widgets
 Comment=Show, hide and reorder the widgets on the Omarchy bar
 Exec=omarchy-shell shell toggle io.github.felipecpaiva.omabarconfigurator

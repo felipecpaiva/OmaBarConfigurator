@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Installs OmaBar Configurator: the panel, in the Applications list, and one
+# Installs OmaBar: the panel, in the Applications list, and one
 # invisible bar entry that draws the pills. See README.md.
 set -euo pipefail
 
@@ -44,5 +44,5 @@ fi
 install -Dm644 "$DESKTOP_SRC" "$DESKTOP_DEST"
 
 echo
-echo "Done. Super+Space -> Apps -> OmaBar Configurator."
+echo "Done. Super+Space -> Apps -> OmaBar."
 echo "Uninstall with: $REPO_DIR/uninstall.sh"
