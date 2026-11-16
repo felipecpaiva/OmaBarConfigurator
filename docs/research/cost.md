@@ -1,0 +1,75 @@
+# Cost of group pills: idle CPU and memory
+
+Measured on one machine, Omarchy 4.5, with the real bar and widgets. Quality bar section 2 asks for
+at most 0.1 percentage point of idle CPU and at most 2 MB of RSS between pills on and pills off.
+
+## Method
+
+- Process: the shell, `quickshell -n -p /usr/share/omarchy/shell`. Same PID for the whole run.
+- CPU: utime + stime ticks from `/proc/<pid>/stat` over a 60 s window (100 ticks per second, so
+  60 ticks = 1 percentage point of one core). RSS: `VmRSS` from `/proc/<pid>/status` at the end of
+  each window.
+- Before each window: change the store, wait 10 s warm-up. The store was written to a temp file
+  and moved over the real one, like the panel does.
+- States: off = `style.enabled` false. on = `style.enabled` true, default style, solo
+  `["omarchy.menu"]`. solo = on, solo `["omarchy.bluetooth"]`, Smooth movement left at default.
+- Order, to cancel drift: off, on, solo, off, on, solo, off, on, solo (9 windows, 3 per state).
+- Shell was not restarted, the layout was not changed, no input was injected.
+
+## Raw numbers
+
+| Run | State | CPU ticks in 60 s | CPU % of one core | RSS (MB) | Load avg (1 min) |
+|-----|-------|------------------:|------------------:|---------:|-----------------:|
+| 1 | off | 240 | 4.00 | 1300.1 | 2.11 |
+| 2 | on | 224 | 3.73 | 1303.7 | 1.44 |
+| 3 | solo | 403 | 6.72 | 1348.3 | 1.73 |
+| 4 | off | 643 | 10.72 | 1359.1 | 1.94 |
+| 5 | on | 281 | 4.68 | 1251.1 | 2.03 |
+| 6 | solo | 233 | 3.88 | 1248.2 | 1.88 |
+| 7 | off | 237 | 3.95 | 1250.6 | 1.81 |
+| 8 | on | 238 | 3.97 | 1252.2 | 1.72 |
+| 9 | solo | 234 | 3.90 | 1248.4 | 1.45 |
+
+(RSS in MiB, from kB / 1024.)
+
+## Summary
+
+| State | Mean CPU % | Median CPU % | Mean RSS (MB) | Last-run RSS (MB) |
+|-------|-----------:|-------------:|--------------:|------------------:|
+| off | 6.22 | 4.00 | 1303.4 | 1250.6 |
+| on | 4.13 | 3.97 | 1269.0 | 1252.2 |
+| solo | 4.83 | 3.90 | 1281.6 | 1248.4 |
+
+Differences (on minus off):
+
+- CPU, means: -2.09 points. CPU, medians: -0.03 points.
+- RSS, means: -34 MB. RSS, last run of each state: +1.6 MB.
+- solo minus off: median CPU -0.10 points, last-run RSS -2.2 MB.
+
+## Verdict per quality-bar line
+
+- Idle CPU, pills on vs off, at most 0.1 point: **PASS on the median** (-0.03), but **not
+  proven by the means**, which are dominated by two outlier windows (run 3 at 6.7 percent and run 4
+  at 10.7 percent). The five quiet windows of runs 5 to 9 sit between 3.88 and 4.68 percent with no
+  link to the state. Pills do not add a measurable steady cost, but this run cannot show a 0.1 point
+  difference through the noise.
+- RSS, at most 2 MB: **PASS only for the settled windows** (runs 7, 8, 9: 1250.6, 1252.2 and
+  1248.4 MB, spread 3.8 MB, on vs off +1.6 MB). Over the whole run it is **inconclusive**: RSS fell
+  about 100 MB between run 4 and run 5 (a garbage collection or a trim in the shell), which is far
+  larger than the 2 MB limit and has nothing to do with pills.
+
+## Caveats
+
+- This is not an idle machine. About 4 percent of one core is the shell's normal background work
+  here, and the load average stayed between 1.4 and 2.1 on a 32 thread machine. Another process was
+  also changing bar widgets (shell move commands were seen at the start), which may explain the
+  outlier windows 3 and 4. Re-run on a quiet session for a clean number.
+- Only 3 windows per state, one machine, one bar layout. The 0.1 point and 2 MB limits are below
+  the observed window to window noise, so a firm pass needs more windows (10 or more per state) or
+  the shell's own timers paused.
+- Widgets: the clock shows HH:mm (minute text, no second tick). The keyboard layout widget polls
+  every 10 s. I found no widget in the bar that updates every second. Other live widgets (weather,
+  system monitor, network, tray) wake on their own timers in all states, so they are part of the
+  baseline in both.
+- Pills only change drawing, so the cost should show up as paint work when the layout changes, not
+  as idle work. This test measures idle only.
