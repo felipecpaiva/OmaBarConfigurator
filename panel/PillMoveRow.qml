@@ -3,8 +3,8 @@ import qs.Commons
 import qs.Commons as Commons
 import qs.Ui
 
-// "Move pill N to Left / Center / Right", shown at a pill's first row on the
-// Groups page. The current area is the active chip; a pick calls panel.movePill.
+// "Move this pill to Left / Center / Right", shown in the Groups page detail row.
+// The current area is the active chip; a pick calls panel.movePill.
 Item {
   id: row
 
@@ -23,7 +23,7 @@ Item {
     anchors.leftMargin: Style.space(8)
     anchors.verticalCenter: parent.verticalCenter
     textFormat: Text.PlainText
-    text: "Move pill " + row.pill + " to"
+    text: "Move this pill to"
     color: row.dim
     font.family: row.fontFamily
     font.pixelSize: Style.font.caption

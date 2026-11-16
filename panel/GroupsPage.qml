@@ -2,31 +2,19 @@ import QtQuick
 import qs.Commons
 import qs.Commons as Commons
 import qs.Ui
-import "../lib/Groups.js" as Groups
-import "../Model.js" as Model
 
-// Groups page: per area, the widgets in bar order, the pill each one sits in,
-// and a switch to start a new pill at that widget. Logic lives in lib/Groups.js.
+// Groups page: a mini bar per section (GroupStrip) where a click between two icons
+// splits or joins a pill, and a detail row (GroupDetail) for the selected widget.
+// Rows, cursor and selection live on the panel (panel.groupRows, panel.groupSelected).
 Column {
   id: page
 
-  // The Panel root: storeData, liveLayout, writeBreaks(), widgetName(), widgetGlyph(),
-  // widgetGlyphFamily(), movePill(), busy, foreground, dim, fontFamily, selectedFill.
+  // The Panel root, passed by Panel.qml through setSource.
   property var panel: null
 
-  readonly property var breaks: panel && panel.storeData && panel.storeData.groups ? panel.storeData.groups.breaks : null
-  readonly property var rules: {
-    var g = panel && panel.storeData ? panel.storeData.groups : null
-    return { solo: g ? g.solo : [], noPill: g ? g.noPill : [], centerParts: !!(g && g.centerParts) }
-  }
+  readonly property var groups: panel && panel.storeData ? panel.storeData.groups : null
+  readonly property bool centerParts: !!(page.groups && page.groups.centerParts)
   readonly property bool pillsOn: !!(panel && panel.storeData && panel.storeData.style && panel.storeData.style.enabled)
-  readonly property string selfId: Model.SELF_ID
-  readonly property var areaRows: Groups.rows(panel ? panel.liveLayout : null, breaks, page.selfId, rules)
-  readonly property var areas: [
-    { key: "left", title: "LEFT" },
-    { key: "center", title: "CENTER" },
-    { key: "right", title: "RIGHT" }
-  ]
   readonly property color foreground: panel ? panel.foreground : Commons.Color.foreground
   readonly property color dim: panel ? panel.dim : Qt.darker(Commons.Color.foreground, 1.5)
   readonly property string fontFamily: panel ? panel.fontFamily : Style.font.family
@@ -34,45 +22,25 @@ Column {
   width: parent ? parent.width : 0
   spacing: Style.space(4)
 
-  Text {
-    visible: !page.pillsOn
-    width: parent.width
-    textFormat: Text.PlainText
-    wrapMode: Text.WordWrap
-    text: "Pills are off. Turn them on in Pills to see groups on the bar."
-    color: page.dim
-    font.family: page.fontFamily
-    font.pixelSize: Style.font.caption
-  }
+  Repeater {
+    model: [
+      { show: !page.pillsOn, text: "Pills are off. Turn them on in Pills to see groups on the bar." },
+      { show: true, text: "By default each section is one pill. Click between two icons to split or join." },
+      { show: true, text: "Own gives a widget a pill of its own. None draws no pill, for widgets with their own background." },
+      { show: true, text: "Keys: arrows move, Space splits or joins, S O N set Shared, Own, None, Ctrl+Up or Down moves the pill." }
+    ]
 
-  Text {
-    width: parent.width
-    textFormat: Text.PlainText
-    wrapMode: Text.WordWrap
-    text: "By default each section is one pill. Split it where you want."
-    color: page.dim
-    font.family: page.fontFamily
-    font.pixelSize: Style.font.caption
-  }
-
-  Text {
-    width: parent.width
-    textFormat: Text.PlainText
-    wrapMode: Text.WordWrap
-    text: "A widget that is hidden on the bar cannot start a pill."
-    color: page.dim
-    font.family: page.fontFamily
-    font.pixelSize: Style.font.caption
-  }
-
-  Text {
-    width: parent.width
-    textFormat: Text.PlainText
-    wrapMode: Text.WordWrap
-    text: "Own gives a widget a pill of its own, and suits widgets with plain icons. None draws no pill behind it, and suits widgets that draw their own background, for example a workspaces switcher."
-    color: page.dim
-    font.family: page.fontFamily
-    font.pixelSize: Style.font.caption
+    Text {
+      required property var modelData
+      visible: modelData.show
+      width: page.width
+      textFormat: Text.PlainText
+      wrapMode: Text.WordWrap
+      text: modelData.text
+      color: page.dim
+      font.family: page.fontFamily
+      font.pixelSize: Style.font.caption
+    }
   }
 
   Item {
@@ -97,9 +65,9 @@ Column {
       anchors.verticalCenter: parent.verticalCenter
       enabled: !!page.panel && !page.panel.busy
       opacity: enabled ? 1 : 0.4
-      checked: page.rules.centerParts
+      checked: page.centerParts
       foreground: page.foreground
-      onToggled: page.panel.setCenterParts(!page.rules.centerParts)
+      onToggled: page.panel.setCenterParts(!page.centerParts)
     }
   }
 
@@ -125,53 +93,41 @@ Column {
   }
 
   Repeater {
-    model: page.areas
+    model: ["left", "center", "right"]
 
-    Column {
-      id: section
-      required property var modelData
-      readonly property var widgets: page.areaRows[modelData.key]
+    GroupStrip {
+      required property string modelData
+      panel: page.panel
+      area: modelData
       width: page.width
-      spacing: Style.space(2)
-
-      PanelSectionHeader {
-        text: section.modelData.title
-        topPadding: Math.ceil(fontSize * 0.15) + Style.space(8)
-        foreground: page.foreground
-        fontFamily: page.fontFamily
-      }
-
-      Repeater {
-        model: section.widgets
-
-        Column {
-          id: entry
-          required property var modelData
-          width: section.width
-          spacing: Style.space(2)
-
-          PillMoveRow {
-            visible: entry.modelData.startsPill && entry.modelData.pill > 0
-            width: parent.width
-            panel: page.panel
-            area: section.modelData.key
-            pill: entry.modelData.pill
-            foreground: page.foreground
-            dim: page.dim
-            fontFamily: page.fontFamily
-          }
-
-          GroupRow {
-            width: parent.width
-            panel: page.panel
-            area: section.modelData.key
-            row: entry.modelData
-            foreground: page.foreground
-            dim: page.dim
-            fontFamily: page.fontFamily
-          }
-        }
-      }
+      foreground: page.foreground
+      dim: page.dim
+      fontFamily: page.fontFamily
     }
+  }
+
+  Text {
+    width: parent.width
+    textFormat: Text.PlainText
+    wrapMode: Text.WordWrap
+    text: "A widget that is hidden on the bar still shows here."
+    color: page.dim
+    font.family: page.fontFamily
+    font.pixelSize: Style.font.caption
+  }
+
+  Rectangle {
+    width: parent.width
+    height: 1
+    color: page.dim
+    opacity: 0.4
+  }
+
+  GroupDetail {
+    width: parent.width
+    panel: page.panel
+    foreground: page.foreground
+    dim: page.dim
+    fontFamily: page.fontFamily
   }
 }
