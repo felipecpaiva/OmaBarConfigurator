@@ -164,4 +164,16 @@ try {
   console.log("SKIP bar-adapter pipeline: lib/GroupLayout.js not present")
 }
 
+// inkSpan: Text and Image items count, Rectangles and hidden items do not.
+;(function () {
+  function it(props, kids) { var o = Object.assign({ x: 0, y: 0, width: 0, height: 0, visible: true, opacity: 1 }, props); o.children = kids || []; return o }
+  var text = it({ x: 10, width: 30, text: "abc", contentWidth: 20, contentHeight: 10, horizontalAlignment: 4 })
+  var img = it({ x: 50, width: 20, source: "x.png", paintedWidth: 10, paintedHeight: 10 })
+  var hover = it({ x: 0, width: 100, color: "red", radius: 4 })
+  var hidden = it({ x: 90, width: 10, text: "z", contentWidth: 10, visible: false })
+  var slot = it({ width: 100 }, [hover, it({ x: 5 }, [text, img]), hidden])
+  assert.deepStrictEqual(A.inkSpan(slot, false), { lo: 20, hi: 70 })
+  assert.strictEqual(A.inkSpan(it({ width: 10 }, [hover]), false), null)
+})()
+
 console.log("OK bar-adapter")

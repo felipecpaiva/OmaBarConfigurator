@@ -126,6 +126,42 @@ function offsetIn(item, ancestor, vertical) {
   return pos
 }
 
+// Qt alignment flags along each axis: start, end, centre.
+var ALIGN = { h: { end: 2, center: 4 }, v: { end: 64, center: 128 } }
+
+// The visible content of one slot along the bar axis, in the slot's coordinates: the union
+// of visible Text and Image items (glyphs, labels, icons). Rectangles are skipped on
+// purpose: hover fills come and go, and the span must not jump on hover. null when
+// nothing is found, and the slot's box is used. Reading the items makes the calling
+// binding re-run when any of them changes.
+function inkSpan(slot, vertical) {
+  var lo = Infinity, hi = -Infinity
+  var align = vertical ? ALIGN.v : ALIGN.h
+  function add(a, b) { if (b > a) { lo = Math.min(lo, a); hi = Math.max(hi, b) } }
+  function walk(it, off, depth) {
+    if (!it || it.visible === false || it.opacity === 0 || depth > 16) return
+    var pos = off + (vertical ? it.y : it.x), len = vertical ? it.height : it.width
+    if (typeof it.text === "string" && "contentWidth" in it) {
+      if (it.text === "" || !(len > 0)) return
+      var cw = Math.min(vertical ? it.contentHeight : it.contentWidth, len)
+      var a = vertical ? it.verticalAlignment : it.horizontalAlignment
+      var shift = a === align.end ? len - cw : a === align.center ? (len - cw) / 2 : 0
+      add(pos + shift, pos + shift + cw)
+      return
+    }
+    if ("source" in it && "paintedWidth" in it) {
+      var pw = Math.min(vertical ? it.paintedHeight : it.paintedWidth, len)
+      add(pos + (len - pw) / 2, pos + (len + pw) / 2) // images draw centred (PreserveAspectFit)
+      return
+    }
+    var kids = it.children
+    if (kids) for (var i = 0; i < kids.length; i++) walk(kids[i], pos, depth + 1)
+  }
+  var kids = slot ? slot.children : null
+  if (kids) for (var i = 0; i < kids.length; i++) walk(kids[i], 0, 0)
+  return hi > lo ? { lo: lo, hi: hi } : null
+}
+
 // Slots of one area as fresh JS arrays, all in the coordinate space of the
 // area's pill parent: [{ id, start, end }] (center slots also carry part). Input for GroupLayout.pills.
 function areaSlots(located, area, vertical) {
@@ -139,6 +175,8 @@ function areaSlots(located, area, vertical) {
     for (var j = 0; j < slots.length; j++) {
       var start = offsetIn(slots[j], parent, vertical)
       var slot = { id: slotId(slots[j]), start: start, end: start + (vertical ? slots[j].height : slots[j].width) }
+      var ink = inkSpan(slots[j], vertical)
+      if (ink) { slot.inkStart = start + ink.lo; slot.inkEnd = start + ink.hi }
       if (area === "center") slot.part = String(lists[i].region) // centerBegin | center | centerEnd, for the centerParts rule
       out.push(slot)
     }
@@ -156,6 +194,7 @@ if (typeof module !== "undefined") {
     slotsOf: slotsOf,
     slotId: slotId,
     offsetIn: offsetIn,
-    areaSlots: areaSlots
+    areaSlots: areaSlots,
+    inkSpan: inkSpan
   }
 }

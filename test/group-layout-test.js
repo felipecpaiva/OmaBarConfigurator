@@ -11,6 +11,23 @@ function run(left, breaks, opts, area) {
 var row = [S("a", 0, 10), S("b", 10, 20), S("c", 20, 30), S("d", 30, 40)]
 
 var tests = [
+  ["ink: padding counts from visible content, not the widget box", function () {
+    // a: box 0-40, icon 2-38 (drawn at its edges); b: box 40-100, icon 60-80 (wide margins)
+    var slots = { left: [{ id: "a", start: 0, end: 40, inkStart: 2, inkEnd: 38 }, { id: "b", start: 40, end: 100, inkStart: 60, inkEnd: 80 }] }
+    var one = G.pills(slots, {}, { padding: 10, gap: 4 }).left
+    assert.deepStrictEqual([one[0].start, one[0].end], [-8, 90])
+    var two = G.pills(slots, { left: ["b"] }, { padding: 10, gap: 4 }).left
+    // the split sits mid way between the icons (38 and 60): 49, half a gap each side
+    assert.ok(Math.abs(two[0].end - 47) < 1e-9 && Math.abs(two[1].start - 51) < 1e-9)
+    // even pills, measured from the icons: a has 9 px on its right, so 9 on its left too
+    assert.ok(Math.abs(two[0].start - (2 - 9)) < 1e-9)
+    assert.ok(Math.abs(two[1].end - (80 + 9)) < 1e-9)
+  }],
+  ["ink outside the box or empty falls back to the box", function () {
+    var slots = { left: [{ id: "a", start: 0, end: 40, inkStart: 30, inkEnd: 20 }, { id: "b", start: 40, end: 80, inkStart: -50, inkEnd: 200 }] }
+    var p = G.pills(slots, {}, { padding: 5, gap: 4 }).left
+    assert.deepStrictEqual([p[0].start, p[0].end], [-5, 85])
+  }],
   ["one pill per area", function () {
     var r = G.pills({ left: row, center: [S("x", 0, 5)], right: [S("y", 0, 5)] }, {}, { padding: 0, gap: 0 })
     assert.deepStrictEqual(r.left, [{ start: 0, end: 40, ids: ["a", "b", "c", "d"] }])
