@@ -209,3 +209,24 @@ picked Design A, highlight-on-bar later, two-letter fallback OK.
 Open: live round trip for saved layouts (save A, change things B, apply equals A, Undo equals
 B, pill move plus Undo regression); Groups click and key pass (check the cursor ring after
 Ctrl+Down); docs/plan.md rows for these features.
+
+## Spacing pass (2026-11-16, late)
+
+- **Pad from the ink.** BarAdapter.inkSpan measures each slot's visible Text, Image and
+  OpticalGlyph content (clipping respected, Rectangles skipped so hover fills never move a
+  pill); GroupLayout pads from it and splits at the midpoint between icons. Tests in
+  group-layout-test and bar-adapter-test.
+- **Uneven ends are fixed behavior** (Felipe): an end with room keeps full padding; only the side
+  that meets another pill is tight. No setting.
+- **Spacer as space.** omarchy.spacer is never part of a pill (GroupLayout, Groups.rows). A logged
+  measurement showed only 13 points between the sun and robot icons (Omarchy packs widgets with
+  no spacing), so 4.5 points per side with gap 4. Felipe kept one spacer (12) after Weather:
+  about 8 points per side now. Omarchy's CLI allows one spacer per bar.
+- **Always show indicators** (Bar topic) sets the stock indicators widget's alwaysShow, so the
+  hover reveal no longer pushes pills. Saved layouts and Undo now set inline widget settings back
+  (Presets.settingsPlan); a key only the bar has stays, as the CLI cannot remove one.
+- **Saved layouts** also hide and show widgets to match (via OmaBar's hidden records) and can be
+  renamed. Live: save matched the bar, Apply matched the save, Undo worked (Felipe).
+- App name is now "OmaBar" in the launcher, manifest and README; plugin id unchanged.
+- Accepted as is: the Spaces active-workspace box shows a thin square edge past a round pill end
+  (Felipe: that is the active desktop's look).
