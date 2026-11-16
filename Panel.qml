@@ -838,8 +838,6 @@ Item {
   function visibilityPlan(target, name) {
     var d = Presets.widgetDiff(root.liveLayout, target)
     var names = function(list) { return list.map(function(id) { return root.widgetName(id) }).join(", ") }
-    if (d.changed.length)
-      return { error: "The settings of " + names(d.changed) + " changed since " + name + " was saved, so it cannot be applied. Save a new layout instead." }
     var lost = d.missing.filter(function(id) { return !root.savedRecord(id) })
     if (lost.length)
       return { error: name + " has " + names(lost) + ", which is not on the bar and was not hidden here, so OmaBar cannot bring it back. Add it with Omarchy, then Apply again." }
@@ -862,10 +860,13 @@ Item {
   // change). The caller recorded Undo with running true; with nothing to run it ends here.
   function moveToTarget(target, extra, after, mismatch) {
     refreshLive()
-    var p = plan(function() { return Presets.undoPlan(root.liveLayout, target) })
+    // Saved settings first (by id, so order does not matter), then the moves.
+    var sp = plan(function() { return Presets.settingsPlan(root.liveLayout, target) })
+    if (sp.error) { root.layoutError = mismatch; return }
+    var p = plan(function() { return Presets.undoPlan(sp.layout, sp.target) })
     if (p.error) { root.layoutError = mismatch; return }
-    var argv = p.argv.concat(extra)
-    if (argv.length > 0) { runLayout(argv, target, after, mismatch); return }
+    var argv = sp.argv.concat(p.argv, extra)
+    if (argv.length > 0) { runLayout(argv, sp.target, after, mismatch); return }
     var u = PillStyle.readStore(root.lastRawText).undo, text = root.lastRawText
     if (u && u.running) { u.running = false; text = PillStyle.writeStore(text, { undo: u }) }
     commitText(after(text))
@@ -955,8 +956,29 @@ Item {
     background: {
       get: function() { return root.barBackground },
       set: function(value) { root.setBarBackground(value) }
+    },
+    // The stock indicators widget's own alwaysShow option: off, it shows its inactive
+    // icons while the pointer is on the bar, which widens it and pushes the pills.
+    indicatorsAlwaysShow: {
+      get: function() { return root.indicatorsSetting("alwaysShow") === true },
+      set: function(value) {
+        if (root.busy || root.indicatorsSetting("id") === undefined) return
+        runSequence([["omarchy-bar", "set", "omarchy.indicators", "alwaysShow", value === true ? "true" : "false", "--json"]])
+      }
     }
   })
+
+  // A key of the first omarchy.indicators entry on the bar; undefined when it is not on the bar.
+  function indicatorsSetting(key) {
+    var lay = root.liveLayout
+    for (var s in lay) {
+      var list = lay[s]
+      if (!list || typeof list.length !== "number") continue
+      for (var i = 0; i < list.length; i++)
+        if (list[i] && list[i].id === "omarchy.indicators") return list[i][key]
+    }
+    return undefined
+  }
 
   function settingValue(setting) {
     if (!setting) return undefined

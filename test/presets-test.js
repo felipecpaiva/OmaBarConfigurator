@@ -497,6 +497,24 @@ var tests = [
   console.log("ok   widgetDiff names what blocks a saved layout")
 })()
 
+
+// Settings go back with `set`; keys only the bar has stay (the CLI cannot remove them).
+;(function () {
+  var saved = shaped({ centerBegin: [{ id: "omarchy.indicators" }], right: [{ id: "w", unit: "C" }, "x"] })
+  var now = shaped({ centerBegin: [{ id: "omarchy.indicators", alwaysShow: true }], right: ["x", { id: "w", unit: "F" }] })
+  var sp = P.settingsPlan(now, saved)
+  assert.deepStrictEqual(sp.argv, [["omarchy-bar", "set", "w", "unit", "\"C\"", "--json"]])
+  assert.deepStrictEqual(sp.target.centerBegin, [{ id: "omarchy.indicators", alwaysShow: true }], "extra key kept")
+  assert.deepStrictEqual(sp.target.right[0], { id: "w", unit: "C" })
+  var moves = P.undoPlan(sp.layout, sp.target)
+  assert.strictEqual(moves.error, "", "order is all that is left to plan")
+  var end = P.applyMoves(sp.layout, moves.argv)
+  assert.deepStrictEqual(end.right, sp.target.right)
+  assert.deepStrictEqual(P.settingsPlan(saved, saved).argv, [])
+  assert.deepStrictEqual(saved.right[0], { id: "w", unit: "C" }, "input untouched")
+  console.log("ok   settingsPlan sets saved values back and keeps keys it cannot remove")
+})()
+
 var failed = 0
 tests.forEach(function (t) {
   try { t[1](); console.log("ok   " + t[0]) } catch (e) { failed++; console.log("FAIL " + t[0] + "\n     " + e.message) }
