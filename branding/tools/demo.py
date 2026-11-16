@@ -22,7 +22,8 @@ PLUGIN = "io.github.felipecpaiva.omabarconfigurator"
 # Logical pixels: the whole bar and the panel card under its middle. Frames come out at 2x.
 REGION = "0,0 1280x600"
 # Physical pixels inside a frame: the panel area, and the default bar strip shown zoomed above it.
-PANEL_CROP = (480, 0, 1600, 1200)
+# Narrow enough to leave out notification cards, which stack on the right.
+PANEL_CROP = (760, 0, 1040, 1200)
 STRIP = (440, 1680)  # x and width of the bar strip: the pills from end to end on this bar
 OUT_W = 1100
 
@@ -98,12 +99,12 @@ class Recorder:
     def mark(self, caption):
         self.marks.append((time.time() - self.t0, caption))
 
-    def finish(self, name, strip=None, compose=None, width=None):
+    def finish(self, name, strip=None, compose=None, width=None, panel=None):
         """The bar strip (zoomed, physical pixels) over the panel, both scaled to OUT_W."""
         self.stop = True; self.th.join()
         total = time.time() - self.t0
         sx, sw = strip or STRIP
-        px, py, pw, ph = PANEL_CROP
+        px, py, pw, ph = panel or PANEL_CROP
         compose = compose or (f"split[s][m];[s]crop={sw}:48:{sx}:0,scale={OUT_W}:-1:flags=lanczos,pad=iw:ih+16:0:8:color=#16181d[s2];"
                    f"[m]crop={pw}:{ph}:{px}:{py},scale={OUT_W}:-1:flags=lanczos[m2];[s2][m2]vstack")
         w = width or OUT_W
@@ -132,6 +133,9 @@ def scene(fn):
         shutil.copy(STORE, bak)
         items = indicator_items()
         ws = json.loads(run("hyprctl", "activeworkspace", "-j").stdout or "{}").get("id", 1)
+        # Do not disturb while recording, so no new notification lands in a frame.
+        dnd = run("omarchy-shell", "notifications", "isDnd").stdout.strip()
+        run("omarchy-shell", "notifications", "setDnd", "on")
         focus("8")
         time.sleep(0.6)
         try:
@@ -142,6 +146,7 @@ def scene(fn):
             if indicator_items() != items and items is not None:
                 bar("set", "omarchy.indicators", "items", json.dumps(items), "--json")
             focus(str(ws))
+            run("omarchy-shell", "notifications", "setDnd", dnd if dnd in ("on", "off") else "off")
             print("restored from", bak)
     return wrapped
 
@@ -259,8 +264,9 @@ def saved():
     d = store()
     entry = {"id": str(int(time.time() * 1000)), "name": "Layout 1", "at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
              "layout": start, "groups": d.get("groups", {}), "style": d.get("style", {}), "background": json.load(open(SHELL))["bar"].get("background", "")}
+    patch_top(saved=[])  # start from an empty list; the wrapper puts the user's own list back
     open_panel("presets")
-    rec = Recorder(); rec.start(); time.sleep(0.8)
+    rec = Recorder(region="0,0 1280x800"); rec.start(); time.sleep(0.8)
     try:
         beat(rec, "Save the bar as it is now", 2.4, lambda: patch_top(saved=[entry]))
         beat(rec, "Give it a name", 2.2, lambda: patch_top(saved=[dict(entry, name="My daily bar")]))
@@ -270,7 +276,8 @@ def saved():
             back_to(entry["layout"])
             d2 = store(); d2["groups"] = entry["groups"]; d2["style"] = entry["style"]; write_store(d2)
         beat(rec, "Apply My daily bar: all of it comes back", 3.4, apply)
-        rec.finish("saved")
+        # The saved layouts sit below the presets: show the lower part of the card.
+        rec.finish("saved", panel=(760, 640, 1040, 900))
     finally:
         back_to(start)
 
@@ -307,10 +314,13 @@ def vertical():
     try:
         beat(rec, "Top bar", 2.0)
         beat(rec, "Left: the pills turn with the bar", 3.6, lambda: bar("position", "left"))
-        beat(rec, "Square corners at the top and bottom edges", 2.8, lambda: patch("style", squareEdges=True))
-        beat(rec, "Right", 3.4, lambda: bar("position", "right"))
+        beat(rec, "Square corners at the top and bottom", 2.8, lambda: patch("style", squareEdges=True))
         beat(rec, "Back on top", 2.6, lambda: bar("position", pos))
-        rec.finish("vertical", compose="scale=1100:-1:flags=lanczos")
+        # The top left corner of the screen, where both the top bar and the left bar show.
+        # Two strips: the top bar, and the left bar turned on its side, so both read the same way.
+        rec.finish("vertical", compose="split[a][b];[a]crop=1600:56:0:0[t];[b]crop=56:1600:0:0,transpose=2[l];"
+                   "[t]pad=iw:ih+24:0:12:color=#16181d[t2];[l]pad=iw:ih+24:0:12:color=#16181d[l2];[t2][l2]vstack,"
+                   "scale=1100:-1:flags=lanczos,pad=iw:ih+120:0:0:color=#16181d")
     finally:
         bar("position", pos)
 

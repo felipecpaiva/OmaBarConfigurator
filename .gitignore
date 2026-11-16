@@ -1,5 +1,6 @@
-node_modules/
-*.log
-.shots-backup.json
 *.bak
+*.log
+node_modules/
+__pycache__/
 shell.json
+.shots-backup.json
