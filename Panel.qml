@@ -829,14 +829,46 @@ Item {
     persistPatch({ saved: root.savedLayouts.filter(function(e) { return e.id !== String(id) }) })
   }
 
-  // Apply moves widgets only; it never hides or shows one. So it names what differs.
-  function savedBlockedText(e) {
-    var d = Presets.widgetDiff(root.liveLayout, e.layout)
+  // Runs after the hides and shows of a layout change finish (stepQueue), then clears.
+  property var afterVisibility: null
+
+  // Which widgets to hide and show so the bar holds the same widgets as `target`.
+  // { hide, show } or { error }. A widget can only be shown back from OmaBar's own
+  // hidden record, and the center anchor is never hidden.
+  function visibilityPlan(target, name) {
+    var d = Presets.widgetDiff(root.liveLayout, target)
     var names = function(list) { return list.map(function(id) { return root.widgetName(id) }).join(", ") }
-    if (d.missing.length) return e.name + " has " + names(d.missing) + ", which the bar does not show now. Show it in Widgets, then Apply again."
-    if (d.extra.length) return "The bar now shows " + names(d.extra) + ", which " + e.name + " did not have. Hide it in Widgets, then Apply again."
-    if (d.changed.length) return "The settings of " + names(d.changed) + " changed since " + e.name + " was saved, so it cannot be applied. Save a new layout instead."
-    return "This saved layout cannot be applied to the bar as it is now."
+    if (d.changed.length)
+      return { error: "The settings of " + names(d.changed) + " changed since " + name + " was saved, so it cannot be applied. Save a new layout instead." }
+    var lost = d.missing.filter(function(id) { return !root.savedRecord(id) })
+    if (lost.length)
+      return { error: name + " has " + names(lost) + ", which is not on the bar and was not hidden here, so OmaBar cannot bring it back. Add it with Omarchy, then Apply again." }
+    var anchor = d.extra.filter(function(id) { return root.isLocked({ id: id, visible: true }) })
+    if (anchor.length)
+      return { error: names(anchor) + " holds the center in place, so it cannot be hidden. Move it out of the center first." }
+    return { hide: d.extra, show: d.missing }
+  }
+
+  // Hides run first (each records its entry), then shows one at a time, then `then`.
+  function runVisibility(v, then) {
+    if (v.hide.length === 0 && v.show.length === 0) { then(); return }
+    root.afterVisibility = then
+    root.restoreQueue = v.show.slice()
+    for (var i = 0; i < v.hide.length; i++) hideWidget({ id: v.hide[i], visible: true })
+    if (!root.busy) stepQueue()
+  }
+
+  // Moves to `target` once the widgets match, then runs `extra` commands (a background
+  // change). The caller recorded Undo with running true; with nothing to run it ends here.
+  function moveToTarget(target, extra, after, mismatch) {
+    refreshLive()
+    var p = plan(function() { return Presets.undoPlan(root.liveLayout, target) })
+    if (p.error) { root.layoutError = mismatch; return }
+    var argv = p.argv.concat(extra)
+    if (argv.length > 0) { runLayout(argv, target, after, mismatch); return }
+    var u = PillStyle.readStore(root.lastRawText).undo, text = root.lastRawText
+    if (u && u.running) { u.running = false; text = PillStyle.writeStore(text, { undo: u }) }
+    commitText(after(text))
   }
 
   // Bar layout, background, groups and style back to the saved entry. Undo first
@@ -847,21 +879,25 @@ Item {
     for (var i = 0; i < root.savedLayouts.length; i++) if (root.savedLayouts[i].id === String(id)) e = root.savedLayouts[i]
     if (!e) return
     refreshLive()
+    var v = root.visibilityPlan(e.layout, e.name)
+    if (v.error) { root.layoutError = v.error; return }
     var p = plan(function() { return Presets.undoPlan(root.liveLayout, e.layout) })
-    if (p.error) { root.layoutError = root.savedBlockedText(e); return }
-    var argv = p.argv.slice()
-    if (e.background !== "" && e.background !== root.barBackground) argv.push(["omarchy-bar", "background", e.background])
+    var moves = v.hide.length + v.show.length > 0 || (!p.error && p.argv.length > 0)
     var groups = root.rawStoreSection("groups"), style = root.rawStoreSection("style")
-    if (argv.length === 0 && JSON.stringify(groups) === JSON.stringify(e.groups) && JSON.stringify(style) === JSON.stringify(e.style)) {
+    var newBackground = e.background !== "" && e.background !== root.barBackground
+    if (!moves && !newBackground && JSON.stringify(groups) === JSON.stringify(e.groups) && JSON.stringify(style) === JSON.stringify(e.style)) {
       root.layoutError = "Nothing to change: the bar already looks like " + e.name + "."
       return
     }
+    root.layoutError = ""
     persistPatch({ undo: { layout: Presets.snapshot(root.liveLayout), breaks: root.storeData.groups.breaks,
-                           label: "Applied " + e.name, at: new Date().toISOString(), running: argv.length > 0,
+                           label: "Applied " + e.name, at: new Date().toISOString(), running: moves || newBackground,
                            groups: groups, style: style, background: root.barBackground } })
-    runLayout(argv, e.layout, function(text) {
-      return PillStyle.writeStore(text, { groups: e.groups, style: e.style })
-    }, "The bar did not end up as saved. Use Undo to go back.")
+    root.runVisibility(v, function() {
+      root.moveToTarget(e.layout, newBackground ? [["omarchy-bar", "background", e.background]] : [], function(text) {
+        return PillStyle.writeStore(text, { groups: e.groups, style: e.style })
+      }, "The bar did not end up as saved. Use Undo to go back.")
+    })
   }
 
   // The record is cleared only once the bar is back at the saved layout.
@@ -869,19 +905,23 @@ Item {
     if (root.busy || !root.storeLoaded || !root.canUndo) return
     refreshLive()
     var undo = root.storeData.undo
-    var p = plan(function() { return Presets.undoPlan(root.liveLayout, undo.layout) })
-    if (p.error) { root.layoutError = String(p.error); return }
-    var argv = p.argv.slice()
-    if (undo.background !== "" && undo.background !== root.barBackground) argv.push(["omarchy-bar", "background", undo.background])
-    if (argv.length > 0)
-      persistPatch({ undo: { layout: undo.layout, breaks: undo.breaks, label: undo.label, at: undo.at, running: true,
-                             groups: undo.groups, style: undo.style, background: undo.background } })
-    runLayout(argv, undo.layout, function(text) {
+    var v = root.visibilityPlan(undo.layout, "the Undo point")
+    if (v.error) { root.layoutError = v.error; return }
+    var newBackground = undo.background !== "" && undo.background !== root.barBackground
+    persistPatch({ undo: { layout: undo.layout, breaks: undo.breaks, label: undo.label, at: undo.at, running: true,
+                           groups: undo.groups, style: undo.style, background: undo.background } })
+    root.runVisibility(v, function() {
+      root.moveToTarget(undo.layout, newBackground ? [["omarchy-bar", "background", undo.background]] : [], root.undoAfter(undo), "Undo did not reach the saved layout. Try Undo again.")
+    })
+  }
+
+  function undoAfter(undo) {
+    return function(text) {
       text = PillStyle.writeStore(text, { undo: null })
       // After a saved layout: whole groups and style back; otherwise breaks only, as before.
       if (undo.groups || undo.style) return PillStyle.writeStore(text, { groups: undo.groups || undefined, style: undo.style || undefined })
       return root.writeBreaksText(text, undo.breaks)
-    }, "Undo did not reach the saved layout. Try Undo again.")
+    }
   }
 
   // The live `bar` object from shell.json, a plain JSON copy. Re-read on
@@ -1094,9 +1134,11 @@ Item {
                      JSON.stringify(runner.command))
         // A layout run stops at the first failed step: the next moves were
         // planned against a bar this one did not produce.
-        if (root.layoutRun) {
+        if (root.layoutRun || root.afterVisibility) {
           root.pending = []
+          root.restoreQueue = []
           root.afterLayout = null
+          root.afterVisibility = null
           root.layoutWant = null
           root.layoutError = "Stopped after a failed step. Use Undo to go back."
         }
@@ -1120,6 +1162,12 @@ Item {
       if (root.restoreQueue.length > 0) { stepRestoreQueue(); return }
       pruneRestoredStore()
       refreshLive()
+      if (root.afterVisibility) {
+        var then = root.afterVisibility
+        root.afterVisibility = null
+        then()
+        return
+      }
       if (root.layoutRun) {
         var after = root.afterLayout, want = root.layoutWant
         root.layoutRun = false
