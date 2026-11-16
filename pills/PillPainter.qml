@@ -68,10 +68,19 @@ BarWidget {
     areas[area] = BarAdapter.areaSlots(located, area, vertical)
     var parent = located.parents[area]
     var extent = parent ? (vertical ? parent.height : parent.width) : Infinity
-    return GroupLayout.pills(areas, store.groups.breaks, {
+    var pills = GroupLayout.pills(areas, store.groups.breaks, {
       padding: style.padding, gap: style.gap, min: style.inset, max: extent - style.inset,
       solo: store.groups.solo, noPill: store.groups.noPill, centerParts: store.groups.centerParts
     })[area]
+    // Square edges: the outermost pill runs to the screen edge, in the parent's coordinates.
+    if (style.squareEdges && parent && pills.length && area !== "center") {
+      var top = parent
+      while (top.parent) top = top.parent
+      var before = BarAdapter.offsetIn(parent, null, vertical)
+      if (area === "left") pills[0].start = -before
+      else pills[pills.length - 1].end = (vertical ? top.height : top.width) - before
+    }
+    return pills
   }
 
   // soft: the adapter can still draw, so it has its own flag and never hides a failure.
