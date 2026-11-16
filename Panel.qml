@@ -818,6 +818,12 @@ Item {
     persistPatch({ saved: root.savedLayouts.concat([e]) })
   }
 
+  function renameSavedLayout(id, name) {
+    if (root.busy) return
+    persistPatch({ saved: PillStyle.renameSaved(root.savedLayouts, String(id), String(name)) })
+    keyCatcher.forceActiveFocus()
+  }
+
   function deleteSavedLayout(id) {
     if (root.busy) return
     persistPatch({ saved: root.savedLayouts.filter(function(e) { return e.id !== String(id) }) })

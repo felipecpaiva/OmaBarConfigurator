@@ -37,6 +37,14 @@ test("saved layouts: names count past the highest, makeSaved keeps raw style and
   assert.strictEqual(P.readStore(text).saved[0].name, "Layout 1")
 })
 
+test("saved layouts: rename trims, refuses blank, cuts long names, leaves others", function() {
+  var list = [{ id: "1", name: "Layout 1", layout: {} }, { id: "2", name: "Layout 2", layout: {} }]
+  assert.deepStrictEqual(P.renameSaved(list, "2", "  Work   setup ").map(function (e) { return e.name }), ["Layout 1", "Work setup"])
+  assert.deepStrictEqual(P.renameSaved(list, "2", "   ").map(function (e) { return e.name }), ["Layout 1", "Layout 2"])
+  assert.strictEqual(P.renameSaved(list, "1", "x".repeat(99))[0].name.length, P.MAX_NAME)
+  assert.strictEqual(list[1].name, "Layout 2", "input untouched")
+})
+
 test("undo keeps optional groups, style and background", function() {
   var u = P.readStore('{"undo":{"layout":{},"groups":{"solo":[]},"style":{"gap":2},"background":"glassy"}}').undo
   assert.deepStrictEqual([u.groups, u.style, u.background], [{ solo: [] }, { gap: 2 }, "glassy"])

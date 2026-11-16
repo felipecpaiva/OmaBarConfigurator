@@ -2,8 +2,9 @@ import QtQuick
 import qs.Commons
 import qs.Commons as Commons
 import qs.Ui
+import QtQml
 
-// One saved layout on the Layout page: name and time, then Apply and Delete.
+// One saved layout on the Layout page: an editable name, the time, then Apply and Delete.
 // `entry` is a PillStyle.cleanSaved item; actions go through the Panel root.
 Item {
   id: row
@@ -19,18 +20,37 @@ Item {
 
   implicitHeight: Math.max(label.implicitHeight, applyButton.implicitHeight)
 
-  Text {
+  // The name is a field: click it, type a label, press Enter. Blank names are ignored.
+  TextField {
     id: label
     anchors.left: parent.left
+    anchors.right: when.left
+    anchors.rightMargin: Style.space(6)
+    anchors.verticalCenter: parent.verticalCenter
+    enabled: row.ready
+    maximumLength: 40
+    foreground: row.foreground
+    onEditingFinished: if (text.trim() !== "" && text.trim() !== row.entry.name) row.panel.renameSavedLayout(row.entry.id, text)
+  }
+
+  // A plain `text:` binding breaks once the user types; Binding re-applies it on a rename.
+  Binding {
+    target: label
+    property: "text"
+    value: row.entry.name
+    restoreMode: Binding.RestoreNone
+  }
+
+  Text {
+    id: when
     anchors.right: applyButton.left
-    anchors.rightMargin: Style.space(10)
+    anchors.rightMargin: Style.space(8)
     anchors.verticalCenter: parent.verticalCenter
     textFormat: Text.PlainText
-    elide: Text.ElideRight
-    text: row.entry.name + (row.when !== "" ? ", " + row.when : "")
-    color: row.foreground
+    text: row.when
+    color: row.dim
     font.family: row.fontFamily
-    font.pixelSize: Style.font.bodySmall
+    font.pixelSize: Style.font.caption
   }
 
   Button {
