@@ -48,6 +48,7 @@
       ]
     },
     { "id": "groups", "title": "Groups", "page": "GroupsPage" },
+    { "id": "presets", "title": "Layout", "page": "PresetsPage" },
     {
       "id": "bar",
       "title": "Bar",

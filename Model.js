@@ -9,7 +9,8 @@
 // `shellConfig` may be the whole shell.json object OR just its `bar:` subtree
 // (which is what Bar.qml is handed). Both are accepted; see barConfig().
 
-var REGIONS = ["left", "center", "right"]
+// Util.barSections order minus "tray" (the drawer; see FINDINGS). centerBegin/centerEnd hang off the center box.
+var REGIONS = ["left", "centerBegin", "center", "centerEnd", "right"]
 
 // The painter's own bar entry: hiding it would remove the pills, so the panel never lists it.
 var SELF_ID = "io.github.felipecpaiva.omabarconfigurator"

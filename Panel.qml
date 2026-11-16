@@ -9,6 +9,7 @@ import qs.Ui
 import "Model.js" as Model
 import "lib/PillStyle.js" as PillStyle
 import "lib/Groups.js" as Groups
+import "lib/Presets.js" as Presets
 
 // Bar widget picker: one row per widget on the bar, grouped by the section it
 // sits in, each with a switch for shown/hidden. A hidden widget keeps its row
@@ -122,7 +123,7 @@ Item {
   // so the row goes back under that section header, at the index it will
   // return to, rather than into an orphan group at the bottom.
   readonly property var rows: {
-    var rank = ({ left: 0, center: 1, right: 2 })
+    var rank = ({ left: 0, centerBegin: 1, center: 2, centerEnd: 3, right: 4 })
     var out = []
     for (var i = 0; i < catalogue.length; i++) {
       var entry = catalogue[i]
@@ -140,7 +141,7 @@ Item {
         id: String(entry.id),
         region: region,
         index: entry.visible ? slot : slot - 0.5,
-        rank: rank[region] !== undefined ? rank[region] : 3,
+        rank: rank[region] !== undefined ? rank[region] : 5,
         seq: i,
         visible: !!entry.visible,
         isAnchor: entry.isAnchor === true
@@ -370,6 +371,8 @@ Item {
   }
 
   function regionLabel(region) {
+    if (region === "centerBegin") return "CENTER, BEFORE CLOCK"
+    if (region === "centerEnd") return "CENTER, AFTER CLOCK"
     return region === "" ? "HIDDEN" : String(region).toUpperCase()
   }
 
@@ -496,6 +499,105 @@ Item {
   function toggleBreak(area, id) {
     var result = Groups.toggleBreak(root.storeData.groups.breaks, String(area), String(id))
     writeBreaks(area, result[String(area)])
+  }
+
+  // ---- layout API (presets, move pill, undo; logic lives in lib/Presets.js) --
+  readonly property bool canUndo: root.storeData.undo !== null
+  readonly property string undoLabel: root.canUndo ? root.storeData.undo.label : ""
+  readonly property string undoAt: root.canUndo ? root.storeData.undo.at : ""
+  // The last refusal or failed command, in plain words; cleared by the next run.
+  property string layoutError: ""
+  // True while a layout run is in flight; afterLayout runs once it ends with no failed step.
+  property bool layoutRun: false
+  property var afterLayout: null
+
+  // Widgets that count as "the workspaces widget" for presets: the stock one,
+  // a clone of it, or a compositor widget whose own name or description says
+  // workspace (tornikegomareli.spaces: "Workspace switcher ...").
+  function isWorkspacesWidget(id) {
+    var key = String(id || "")
+    if (key === "omarchy.workspaces" || root.clonedFrom(key) === "omarchy.workspaces") return true
+    var meta = root.widgetMeta(key)
+    if (!meta || String(meta.category || "") !== "Compositor") return false
+    return /\bworkspaces?\b/i.test(String(meta.displayName || "") + " " + String(meta.description || ""))
+  }
+
+  function layoutRoles() {
+    var found = []
+    var keys = ["left", "centerBegin", "center", "centerEnd", "right"]
+    for (var k = 0; k < keys.length; k++) {
+      var list = root.liveLayout[keys[k]] || []
+      for (var i = 0; i < list.length; i++) {
+        var e = list[i]
+        var id = typeof e === "string" ? e : (e && e.id !== undefined ? String(e.id) : "")
+        if (id !== "" && found.indexOf(id) < 0 && root.isWorkspacesWidget(id)) found.push(id)
+      }
+    }
+    return { workspaces: found, selfId: Model.SELF_ID, centerAnchor: String(root.liveBar.centerAnchor || "") }
+  }
+
+  // Saved before any command runs, so a run that fails halfway can still be undone.
+  function saveUndo(label) {
+    persistPatch({ undo: { layout: Presets.snapshot(root.liveLayout), breaks: root.storeData.groups.breaks,
+                           label: label, at: new Date().toISOString() } })
+  }
+
+  function runLayout(argv, after) {
+    root.layoutError = ""
+    if (!argv || argv.length === 0) { if (after) after(); return }
+    root.layoutRun = true
+    root.afterLayout = after || null
+    runSequence(argv)
+  }
+
+  // Every planner refuses with a message rather than half a plan; a throw is
+  // reported the same way so a lib bug never runs anything.
+  function plan(fn) {
+    try { return fn() } catch (e) {
+      console.warn("oma-bar-configurator: layout plan failed:", e)
+      return { error: "Could not plan this change: " + e }
+    }
+  }
+
+  function applyPreset(id) {
+    if (root.busy || !root.storeLoaded) return
+    refreshLive()
+    var label = String(id)
+    for (var i = 0; i < Presets.PRESETS.length; i++)
+      if (Presets.PRESETS[i].id === label) label = Presets.PRESETS[i].label
+    var p = plan(function() { return Presets.presetPlan(root.liveLayout, String(id), root.layoutRoles()) })
+    if (p.error) { root.layoutError = String(p.error); return }
+    if (!p.argv || p.argv.length === 0) { root.layoutError = "Nothing to move: the bar already looks like this."; return }
+    saveUndo(label + " preset")
+    runLayout(p.argv, null)
+  }
+
+  function movePill(area, pillNumber, target) {
+    if (root.busy || !root.storeLoaded) return
+    refreshLive()
+    var p = plan(function() {
+      return Presets.movePillPlan(root.liveLayout, root.storeData.groups.breaks, String(area), Number(pillNumber), String(target), root.layoutRoles())
+    })
+    if (p.error) { root.layoutError = String(p.error); return }
+    if (!p.argv || p.argv.length === 0) { root.layoutError = "Nothing to move: the pill is already there."; return }
+    saveUndo("Moved a pill")
+    var breaks = p.breaks
+    runLayout(p.argv, function() {
+      if (breaks) commitText(PillStyle.patchStore(root.lastRawText, "groups", { breaks: breaks }))
+    })
+  }
+
+  function undoLayout() {
+    if (root.busy || !root.storeLoaded || !root.canUndo) return
+    refreshLive()
+    var undo = root.storeData.undo
+    var p = plan(function() { return Presets.undoPlan(root.liveLayout, undo.layout) })
+    if (p.error) { root.layoutError = String(p.error); return }
+    runLayout(p.argv, function() {
+      var text = PillStyle.writeStore(root.lastRawText, { undo: null })
+      if (undo.breaks) text = PillStyle.patchStore(text, "groups", { breaks: undo.breaks })
+      commitText(text)
+    })
   }
 
   // The live `bar` object from shell.json, a plain JSON copy. Re-read on
@@ -699,9 +801,17 @@ Item {
   Process {
     id: runner
     onExited: function(exitCode) {
-      if (exitCode !== 0)
+      if (exitCode !== 0) {
         console.warn("oma-bar-configurator: command failed (" + exitCode + "):",
                      JSON.stringify(runner.command))
+        // A layout run stops at the first failed step: the next moves were
+        // planned against a bar this one did not produce.
+        if (root.layoutRun) {
+          root.pending = []
+          root.afterLayout = null
+          root.layoutError = "Stopped after a failed step. Use Undo to go back."
+        }
+      }
       root.stepQueue()
     }
   }
@@ -721,6 +831,12 @@ Item {
       if (root.restoreQueue.length > 0) { stepRestoreQueue(); return }
       pruneRestoredStore()
       refreshLive()
+      if (root.layoutRun) {
+        var after = root.afterLayout
+        root.layoutRun = false
+        root.afterLayout = null
+        if (after) after()
+      }
       // Widget names and clone sources change with what is enabled, and so
       // does which slots are drawing.
       refreshPluginInfo()
@@ -1102,7 +1218,10 @@ Item {
             readonly property real cellWidth: (width - spacing * 3) / 4
 
             StatCell { label: "Left"; value: root.regionCount("left") }
-            StatCell { label: "Center"; value: root.regionCount("center") }
+            StatCell {
+              label: "Center"
+              value: root.regionCount("centerBegin") + root.regionCount("center") + root.regionCount("centerEnd")
+            }
             StatCell { label: "Right"; value: root.regionCount("right") }
             StatCell {
               label: "Hidden"

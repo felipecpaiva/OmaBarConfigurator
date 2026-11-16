@@ -40,9 +40,9 @@ function live() {
 
 // Apply what the host does on `plugin disable`: splice the entry out.
 function disable(config, id) {
-  var sections = ["left", "center", "right"]
+  var sections = ["left", "centerBegin", "center", "centerEnd", "right"]
   for (var s = 0; s < sections.length; s++) {
-    var entries = config.bar.layout[sections[s]]
+    var entries = config.bar.layout[sections[s]] || []
     for (var i = 0; i < entries.length; i++) {
       if (M.entryId(entries[i]) === id) {
         entries.splice(i, 1)
@@ -82,9 +82,9 @@ function barSet(config, argv) {
   assert.strictEqual(argv[1], "set")
   var id = argv[2], key = argv[3], raw = argv[4]
   var json = argv.indexOf("--json") === 5
-  var sections = ["left", "center", "right"]
+  var sections = ["left", "centerBegin", "center", "centerEnd", "right"]
   for (var s = 0; s < sections.length; s++) {
-    var entries = config.bar.layout[sections[s]]
+    var entries = config.bar.layout[sections[s]] || []
     for (var i = 0; i < entries.length; i++) {
       if (M.entryId(entries[i]) !== id) continue
       assert.ok(entries[i] && typeof entries[i] === "object",
@@ -632,6 +632,43 @@ tests.push(["SELF_ID is exported", function() {
 }])
 
 // ------------------------------------------------------------------------ run
+
+// ------------------------------------------------- centerBegin / centerEnd
+
+function split() {
+  var c = live()
+  c.bar.layout.centerBegin = [{ id: "omarchy.indicators", mute: true }]
+  c.bar.layout.center = [{ id: "google-calendar.clock", format: "HH:mm" }]
+  c.bar.layout.centerEnd = [{ id: "omarchy.weather" }, { id: "io.github.jcarcinogen.gaming-console" }, { id: "omarchy.system-update" }]
+  return c
+}
+
+test("catalogue lists centerBegin and centerEnd in bar order, anchor unchanged", function() {
+  var rows = M.barCatalogue(split(), [])
+  var order = rows.map(function(r) { return r.region }).filter(function(r, i, a) { return a.indexOf(r) === i })
+  assert.deepStrictEqual(order, ["left", "centerBegin", "center", "centerEnd", "right"])
+  var ce = rows.filter(function(r) { return r.region === "centerEnd" })
+  assert.deepStrictEqual(ce.map(function(r) { return r.id + ":" + r.index }),
+    ["omarchy.weather:0", "io.github.jcarcinogen.gaming-console:1", "omarchy.system-update:2"])
+  assert.deepStrictEqual(rows.filter(function(r) { return r.isAnchor }).map(function(r) { return r.id }), ["google-calendar.clock"])
+})
+
+test("hiding centerEnd and centerBegin widgets restores to the same section, index and settings", function() {
+  var c = split(), before = JSON.stringify(c)
+  assert.strictEqual(M.captureEntry(c, "omarchy.indicators").section, "centerBegin")
+  var p = panel(c)
+  ;["omarchy.indicators", "omarchy.weather", "io.github.jcarcinogen.gaming-console", "omarchy.system-update"].forEach(p.hide)
+  assert.strictEqual(c.bar.layout.centerEnd.length, 0)
+  assert.strictEqual(M.showArgv(p.store[1], c, p.store)[3], "centerEnd")
+  ;["omarchy.system-update", "io.github.jcarcinogen.gaming-console", "omarchy.weather", "omarchy.indicators"].forEach(p.show)
+  assert.strictEqual(JSON.stringify(c), before)
+})
+
+test("hiding a centerEnd widget never moves the center anchor", function() {
+  var c = split()
+  assert.strictEqual(M.isCenterAnchor(c, "omarchy.weather"), false)
+  assert.strictEqual(M.nextAnchorAfterHiding(c, "omarchy.weather"), "google-calendar.clock")
+})
 
 var failed = 0
 tests.forEach(function(pair) {

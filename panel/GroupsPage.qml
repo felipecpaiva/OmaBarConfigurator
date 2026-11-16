@@ -11,7 +11,7 @@ Column {
   id: page
 
   // The Panel root: storeData, liveLayout, writeBreaks(), widgetName(), widgetGlyph(),
-  // widgetGlyphFamily(), foreground, dim, fontFamily, selectedFill.
+  // widgetGlyphFamily(), movePill(), busy, foreground, dim, fontFamily, selectedFill.
   property var panel: null
 
   readonly property var breaks: panel && panel.storeData && panel.storeData.groups ? panel.storeData.groups.breaks : null
@@ -61,6 +61,17 @@ Column {
     font.pixelSize: Style.font.caption
   }
 
+  Text {
+    visible: text !== ""
+    width: parent.width
+    textFormat: Text.PlainText
+    wrapMode: Text.WordWrap
+    text: page.panel ? page.panel.layoutError : ""
+    color: page.dim
+    font.family: page.fontFamily
+    font.pixelSize: Style.font.caption
+  }
+
   Repeater {
     model: page.areas
 
@@ -81,87 +92,105 @@ Column {
       Repeater {
         model: section.widgets
 
-        Rectangle {
-          id: band
+        Column {
+          id: entry
           required property var modelData
           width: section.width
-          height: Style.space(32)
-          radius: Style.space(6)
-          color: modelData.pill % 2 === 0 ? page.panel.selectedFill : "transparent"
+          spacing: Style.space(2)
+
+          PillMoveRow {
+            visible: entry.modelData.startsPill
+            width: parent.width
+            panel: page.panel
+            area: section.modelData.key
+            pill: entry.modelData.pill
+            foreground: page.foreground
+            dim: page.dim
+            fontFamily: page.fontFamily
+          }
 
           Rectangle {
-            id: chip
-            anchors.left: parent.left
-            anchors.leftMargin: Style.space(8)
-            anchors.verticalCenter: parent.verticalCenter
-            width: Style.space(20)
-            height: width
-            radius: width / 2
-            color: "transparent"
-            border.width: 1
-            border.color: page.dim
+            id: band
+            readonly property var modelData: entry.modelData
+            width: section.width
+            height: Style.space(32)
+            radius: Style.space(6)
+            color: modelData.pill % 2 === 0 ? page.panel.selectedFill : "transparent"
+
+            Rectangle {
+              id: chip
+              anchors.left: parent.left
+              anchors.leftMargin: Style.space(8)
+              anchors.verticalCenter: parent.verticalCenter
+              width: Style.space(20)
+              height: width
+              radius: width / 2
+              color: "transparent"
+              border.width: 1
+              border.color: page.dim
+              Text {
+                anchors.centerIn: parent
+                textFormat: Text.PlainText
+                text: String(band.modelData.pill)
+                color: page.foreground
+                font.family: page.fontFamily
+                font.pixelSize: Style.font.caption
+              }
+            }
+
             Text {
-              anchors.centerIn: parent
+              id: glyph
+              anchors.left: chip.right
+              anchors.leftMargin: Style.space(10)
+              anchors.verticalCenter: parent.verticalCenter
+              width: Style.space(20)
+              horizontalAlignment: Text.AlignHCenter
               textFormat: Text.PlainText
-              text: String(band.modelData.pill)
+              text: page.panel.widgetGlyph(band.modelData.id)
               color: page.foreground
+              font.family: page.panel.widgetGlyphFamily(band.modelData.id)
+              font.pixelSize: Style.font.title
+            }
+
+            Text {
+              anchors.left: glyph.right
+              anchors.leftMargin: Style.space(8)
+              anchors.right: band.modelData.first ? parent.right : label.left
+              anchors.rightMargin: Style.space(8)
+              anchors.verticalCenter: parent.verticalCenter
+              textFormat: Text.PlainText
+              elide: Text.ElideRight
+              text: page.panel.widgetName(band.modelData.id)
+              color: page.foreground
+              font.family: page.fontFamily
+              font.pixelSize: Style.font.body
+            }
+
+            Text {
+              id: label
+              visible: !band.modelData.first
+              anchors.right: startSwitch.left
+              anchors.rightMargin: Style.space(8)
+              anchors.verticalCenter: parent.verticalCenter
+              textFormat: Text.PlainText
+              text: band.modelData.repeat ? "Same widget appears earlier; split there" : "New pill starts here"
+              color: page.dim
               font.family: page.fontFamily
               font.pixelSize: Style.font.caption
             }
-          }
 
-          Text {
-            id: glyph
-            anchors.left: chip.right
-            anchors.leftMargin: Style.space(10)
-            anchors.verticalCenter: parent.verticalCenter
-            width: Style.space(20)
-            horizontalAlignment: Text.AlignHCenter
-            textFormat: Text.PlainText
-            text: page.panel.widgetGlyph(band.modelData.id)
-            color: page.foreground
-            font.family: page.panel.widgetGlyphFamily(band.modelData.id)
-            font.pixelSize: Style.font.title
-          }
-
-          Text {
-            anchors.left: glyph.right
-            anchors.leftMargin: Style.space(8)
-            anchors.right: band.modelData.first ? parent.right : label.left
-            anchors.rightMargin: Style.space(8)
-            anchors.verticalCenter: parent.verticalCenter
-            textFormat: Text.PlainText
-            elide: Text.ElideRight
-            text: page.panel.widgetName(band.modelData.id)
-            color: page.foreground
-            font.family: page.fontFamily
-            font.pixelSize: Style.font.body
-          }
-
-          Text {
-            id: label
-            visible: !band.modelData.first
-            anchors.right: startSwitch.left
-            anchors.rightMargin: Style.space(8)
-            anchors.verticalCenter: parent.verticalCenter
-            textFormat: Text.PlainText
-            text: band.modelData.repeat ? "Same widget appears earlier; split there" : "New pill starts here"
-            color: page.dim
-            font.family: page.fontFamily
-            font.pixelSize: Style.font.caption
-          }
-
-          ToggleSwitch {
-            id: startSwitch
-            visible: !band.modelData.first
-            anchors.right: parent.right
-            anchors.rightMargin: Style.space(8)
-            anchors.verticalCenter: parent.verticalCenter
-            enabled: !band.modelData.repeat
-            opacity: enabled ? 1 : 0.4
-            checked: band.modelData.startsPill
-            foreground: page.foreground
-            onToggled: page.panel.toggleBreak(section.modelData.key, band.modelData.id)
+            ToggleSwitch {
+              id: startSwitch
+              visible: !band.modelData.first
+              anchors.right: parent.right
+              anchors.rightMargin: Style.space(8)
+              anchors.verticalCenter: parent.verticalCenter
+              enabled: !band.modelData.repeat
+              opacity: enabled ? 1 : 0.4
+              checked: band.modelData.startsPill
+              foreground: page.foreground
+              onToggled: page.panel.toggleBreak(section.modelData.key, band.modelData.id)
+            }
           }
         }
       }

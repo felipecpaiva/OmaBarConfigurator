@@ -84,6 +84,19 @@ Each batch ends green on `bash test/run-all.sh` and is logged in `docs/batch-log
   identical `bar.layout` (same proof style as FINDINGS.md), inline widget settings survive, and the
   anchor rule held.
 
+### Batch 4.5: look and feel pass (requested by Felipe, 2026-11-16)
+Before release, a visual pass judged on screenshots against Denial, Islands Bar and Nyxiri
+(quality bar section 1, blind side by side). Known problems, from Felipe:
+- **Workspaces widget inside a pill (top left).** The way `tornikegomareli.spaces` marks the
+  active window and desktop (its own tall tiles) looks wrong inside a pill: a box inside a box,
+  taller than the pill. Options to weigh: the widget's own style settings (`activeStyle`,
+  `density`), a per-group "no pill" or "tight" option, or letting a widget that paints its own
+  background opt out of the shared pill.
+- **Spacing between widgets inside a group.** Splits and the space around widgets in a pill do not
+  look right. Ties to row 16 (real spacing); research what control Omarchy gives before choosing.
+- **Done when** Felipe approves before and after screenshots of the bar, and the blind comparison
+  rates ours at least as clean as the two competitors.
+
 ### Batch 5: release v0.2.0
 - `uninstall.sh` repeats `omarchy plugin disable` until no painter entry is left.
 - README: what pills are, the install prompt note, the corrected `bar.layout` line, the recovery
