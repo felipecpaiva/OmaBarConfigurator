@@ -481,6 +481,7 @@ if (typeof module !== "undefined") {
     restoreSettingsArgv: restoreSettingsArgv,
     showSequence: showSequence,
     isCenterAnchor: isCenterAnchor,
+    centerAnchorId: centerAnchorId,
     nextAnchorAfterHiding: nextAnchorAfterHiding,
     // exported for the tests and for Panel.qml's own row rendering
     SELF_ID: SELF_ID,

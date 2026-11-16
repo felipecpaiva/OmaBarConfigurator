@@ -5,7 +5,8 @@ import os, subprocess, tempfile
 FONT = "/usr/share/fonts/TTF/JetBrainsMonoNerdFont-Bold.ttf"
 
 
-def build(frames, total, marks, out_dir, name, width=960, fps=12, mp4_width=1280, fontsize=38):
+def build(frames, total, marks, out_dir, name, width=960, fps=12, mp4_width=1280, fontsize=38, compose=""):
+    """compose: an ffmpeg filter graph from [0:v] to one unlabeled stream (OmaBar: bar strip over the panel)."""
     os.makedirs(out_dir, exist_ok=True)
     seq = tempfile.mkdtemp(prefix="omabar-seq-")
     n, j = int(total * fps), 0
@@ -18,7 +19,7 @@ def build(frames, total, marks, out_dir, name, width=960, fps=12, mp4_width=1280
     draw = ",".join(
         f"drawtext=fontfile={FONT}:text='{esc(c)}':fontsize={fontsize}:fontcolor=#e8e6ff:box=1:boxcolor=#16181dcc:boxborderw=18:x=(w-text_w)/2:y=h-90:enable='between(t,{a:.2f},{e:.2f})'"
         for (a, c), e in zip(marks, ends) if c)
-    pre = draw + "," if draw else ""
+    pre = (compose + "," if compose else "") + (draw + "," if draw else "")
     src = ["-framerate", str(fps), "-i", os.path.join(seq, "s%05d.jpg")]
     gif = f"{pre}scale={width}:-1:flags=lanczos,split[a][b];[a]palettegen=max_colors=96[p];[b][p]paletteuse=dither=bayer:bayer_scale=4"
     subprocess.run(["ffmpeg", "-y", "-loglevel", "error", *src, "-filter_complex", gif, "-loop", "0", os.path.join(out_dir, name + ".gif")], check=True)

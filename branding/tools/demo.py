@@ -19,7 +19,12 @@ STORE = os.path.join(HOME, ".config/omarchy/oma-bar-configurator.json")
 SHELL = os.path.join(HOME, ".config/omarchy/shell.json")
 PLUGIN = "io.github.felipecpaiva.omabarconfigurator"
 # Logical pixels (the screen is scaled): the bar plus the panel card under its middle.
-REGION = os.environ.get("OMABAR_DEMO_REGION", "240,0 800x600")
+# Logical pixels: the whole bar and the panel card under its middle. Frames come out at 2x.
+REGION = "0,0 1280x600"
+# Physical pixels inside a frame: the panel area, and the default bar strip shown zoomed above it.
+PANEL_CROP = (480, 0, 1600, 1200)
+STRIP = (440, 1680)  # x and width of the bar strip: the pills from end to end on this bar
+OUT_W = 1100
 
 
 def env():
@@ -74,7 +79,8 @@ def bar(*args):
 
 class Recorder:
     """grim in a loop; frames carry their own time so slow captures keep real timing."""
-    def __init__(self):
+    def __init__(self, region=None):
+        self.region = region or REGION
         self.dir = tempfile.mkdtemp(prefix="omabar-frames-")
         self.frames, self.marks, self.stop, self.t0 = [], [], False, None
 
@@ -85,17 +91,23 @@ class Recorder:
             while not self.stop:
                 p = os.path.join(self.dir, f"f{k:05d}.jpg")
                 t = time.time() - self.t0
-                run("grim", "-g", REGION, "-t", "jpeg", "-q", "88", p)
+                run("grim", "-g", self.region, "-t", "jpeg", "-q", "88", p)
                 if os.path.exists(p): self.frames.append((t, p)); k += 1
         self.th = threading.Thread(target=loop); self.th.start()
 
     def mark(self, caption):
         self.marks.append((time.time() - self.t0, caption))
 
-    def finish(self, name, width=800):
+    def finish(self, name, strip=None, compose=None, width=None):
+        """The bar strip (zoomed, physical pixels) over the panel, both scaled to OUT_W."""
         self.stop = True; self.th.join()
         total = time.time() - self.t0
-        gifkit.build(self.frames, total, self.marks, OUT, name, width=width, fontsize=30)
+        sx, sw = strip or STRIP
+        px, py, pw, ph = PANEL_CROP
+        compose = compose or (f"split[s][m];[s]crop={sw}:48:{sx}:0,scale={OUT_W}:-1:flags=lanczos,pad=iw:ih+16:0:8:color=#16181d[s2];"
+                   f"[m]crop={pw}:{ph}:{px}:{py},scale={OUT_W}:-1:flags=lanczos[m2];[s2][m2]vstack")
+        w = width or OUT_W
+        gifkit.build(self.frames, total, self.marks, OUT, name, width=w, mp4_width=w, fontsize=30, compose=compose)
         print("wrote", os.path.join(OUT, name + ".gif"), f"{len(self.frames)} frames in {total:.1f} s")
 
 
@@ -197,7 +209,114 @@ def indicators():
     rec.finish("indicators")
 
 
-SCENES = {"pills": pills, "groups": groups, "themes": themes, "indicators": indicators}
+TOOLS = os.path.dirname(os.path.abspath(__file__))
+
+
+def plan(*args):
+    return json.loads(subprocess.run(["node", os.path.join(TOOLS, "plan.js"), *args], capture_output=True, text=True).stdout or "{}")
+
+
+def run_argv(argv):
+    for a in argv:
+        r = run(*a)
+        if r.returncode: print("step failed", a, r.stderr.strip())
+
+
+def layout_now():
+    return json.load(open(SHELL))["bar"]["layout"]
+
+
+def back_to(layout):
+    tmp = tempfile.mktemp(suffix=".json"); json.dump(layout, open(tmp, "w"))
+    run_argv(plan("to", tmp).get("argv", []))
+
+
+def preset(pid):
+    p = plan("preset", pid)
+    run_argv(p.get("argv", []))
+    if p.get("breaks"): patch("groups", breaks=p["breaks"])
+
+
+@scene
+def presets():
+    start = layout_now()
+    open_panel("presets")
+    rec = Recorder(); rec.start(); time.sleep(0.8)
+    try:
+        beat(rec, "Layout presets", 1.8)
+        beat(rec, "Spread: groups at both edges", 3.2, lambda: preset("spread"))
+        beat(rec, "Denial: workspaces centered, the rest right", 3.4, lambda: preset("denial"))
+        beat(rec, "Grouped: everything beside the clock", 3.4, lambda: preset("grouped"))
+        beat(rec, "Undo: back exactly as it was", 3.0, lambda: back_to(start))
+        rec.finish("presets")
+    finally:
+        back_to(start)
+
+
+@scene
+def saved():
+    start = layout_now()
+    d = store()
+    entry = {"id": str(int(time.time() * 1000)), "name": "Layout 1", "at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+             "layout": start, "groups": d.get("groups", {}), "style": d.get("style", {}), "background": json.load(open(SHELL))["bar"].get("background", "")}
+    open_panel("presets")
+    rec = Recorder(); rec.start(); time.sleep(0.8)
+    try:
+        beat(rec, "Save the bar as it is now", 2.4, lambda: patch_top(saved=[entry]))
+        beat(rec, "Give it a name", 2.2, lambda: patch_top(saved=[dict(entry, name="My daily bar")]))
+        beat(rec, "Experiment: another layout", 3.0, lambda: preset("spread"))
+        beat(rec, "Experiment: another look", 2.4, lambda: patch("style", radius=4, color="accent", fillOpacity=0.35))
+        def apply():
+            back_to(entry["layout"])
+            d2 = store(); d2["groups"] = entry["groups"]; d2["style"] = entry["style"]; write_store(d2)
+        beat(rec, "Apply My daily bar: all of it comes back", 3.4, apply)
+        rec.finish("saved")
+    finally:
+        back_to(start)
+
+
+def patch_top(**kw):
+    d = store(); d.update(kw); write_store(d)
+
+
+def spacer_size():
+    for sec in layout_now().values():
+        for e in sec:
+            if isinstance(e, dict) and e.get("id") == "omarchy.spacer": return e.get("size")
+    return None
+
+
+@scene
+def spacer():
+    size = spacer_size()
+    if size is None: print("no spacer on the bar, skipping"); return
+    open_panel("pills")
+    rec = Recorder(); rec.start(); time.sleep(0.8)
+    try:
+        beat(rec, "Where two pills meet, Omarchy leaves no room", 3.0, lambda: bar("set", "omarchy.spacer", "size", "0", "--json"))
+        beat(rec, "One Omarchy spacer: real room between pills", 3.4, lambda: bar("set", "omarchy.spacer", "size", "12", "--json"))
+        rec.finish("spacer", strip=(1040, 900))
+    finally:
+        bar("set", "omarchy.spacer", "size", json.dumps(size), "--json")
+
+
+@scene
+def vertical():
+    pos = json.load(open(SHELL))["bar"].get("position", "top")
+    rec = Recorder(region="0,0 1280x800"); rec.start(); time.sleep(0.6)
+    try:
+        beat(rec, "Top bar", 2.0)
+        beat(rec, "Left: the pills turn with the bar", 3.6, lambda: bar("position", "left"))
+        beat(rec, "Square corners at the top and bottom edges", 2.8, lambda: patch("style", squareEdges=True))
+        beat(rec, "Right", 3.4, lambda: bar("position", "right"))
+        beat(rec, "Back on top", 2.6, lambda: bar("position", pos))
+        rec.finish("vertical", compose="scale=1100:-1:flags=lanczos")
+    finally:
+        bar("position", pos)
+
+
+SCENES = {"pills": pills, "groups": groups, "themes": themes, "indicators": indicators,
+          "presets": presets, "saved": saved, "spacer": spacer, "vertical": vertical}
 
 if __name__ == "__main__":
     for s in sys.argv[1:] or list(SCENES):
