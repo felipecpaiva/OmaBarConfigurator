@@ -101,3 +101,13 @@ adapter OK, contract 21 names, no timers, qualified Color, private names, qmllin
 scrub. shellcheck SKIP.
 
 Not checked yet: everything live (the panel has never been opened with this code).
+
+Live check (2026-11-16, Felipe restarted the shell himself): the panel opens with no OmaBar error
+in the full Quickshell log; topic switcher shows Widgets, Pills, Groups, Bar; the Widgets page is
+unchanged and does not list the painter; the Pills page renders subgroups Basics, Shape, Color,
+help texts with defaults, radius as a number field, whole-number slider labels, the color
+dropdown fits. Groups and Bar pages confirmed fine by Felipe. Not tested live: saving from a
+control (no slider dragged, no switch changed), mouse wheel over a slider.
+
+Found (from v0.1, not batch 3): the Widgets page lists only left, center and right, so widgets in
+`centerBegin` and `centerEnd` are missing from it (Model.js REGIONS). Planned as a fix in batch 4.

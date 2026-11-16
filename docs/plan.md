@@ -70,6 +70,7 @@ Each batch ends green on `bash test/run-all.sh` and is logged in `docs/batch-log
   does not break the bar, and the store round trip test passes.
 
 ### Batch 4: presets and move pill (rows 6, 15)
+- Fix from v0.1: the Widgets page must also list `centerBegin` and `centerEnd` (Model.js REGIONS).
 - `lib/Presets.js`: preset to an ordered list of `omarchy bar move` argv; snapshot of the layout
   saved in the store before applying; one Undo button.
 - Presets name widgets by role, never by fixed id: "the workspaces widget" matches
