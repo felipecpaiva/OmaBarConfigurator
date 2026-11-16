@@ -175,3 +175,37 @@ its icon and its neighbours have equal ends; the clock Own and split center pill
 sides. A pixel-scan measurement was tried and dropped (text and the Spaces tile break the scan
 row); judged on zoomed screenshots instead. Remaining: the Spaces widget's own active tile is
 taller than a pill (a widget-level limit, not OmaBar). Store restored after the test.
+
+## Grouping rework and look options (2026-11-16, evening)
+
+Felipe asked for a more direct Groups page after research (docs/research/grouping-ux.md); he
+picked Design A, highlight-on-bar later, two-letter fallback OK.
+
+- **Mini bar Groups page.** One strip per section (panel/GroupStrip.qml, GroupChip.qml), a
+  detail row (GroupDetail.qml); GroupRow.qml removed. Seams split or join; locked seams (Own,
+  None, center parts) select the widget that causes them; joined seams hide until hover or cursor.
+  Keys: arrows walk chips and seams, Space toggles, s/o/n set the mode, Ctrl+Up/Down moves the
+  pill. Logic in lib/Groups.js (seam, stops, step, locate, endsPill) with tests; cursor and
+  selection live in Panel.qml so a pill move keeps the selection. Live: screenshots White and
+  Tokyo Night; no click or key test yet (no input injection).
+- **Open on a topic.** `omarchy-shell shell toggle io.github.felipecpaiva.omabarconfigurator
+  '{"topic":"groups"}'`, used for screenshots without input.
+- **Icons.** Plugin manifests carry no icon field (checked all 14 installed plugins), so known
+  third-party widgets get glyphs in Panel.qml glyphById; others show initials (Model.letters).
+- **Square corners at the screen edge** (style.squareEdges, off by default). The outermost pill
+  runs to the screen edge, square on that side, outline pushed past the edge. Only when the
+  outer pill holds the area's outermost widget (a None widget there leaves it round). Live pixel
+  checks: top bar both ends, left vertical bar both ends, Tokyo Night.
+- **Solid bar tint.** With the default Background fill on a Solid bar the pill equals the bar
+  (1.00:1). The painter now tints the bar's own color 10% toward the text color: measured
+  1.21:1 White, 1.17:1 Tokyo Night. Solid is read from shell.json (the plugin bar API has
+  `transparent` but no `glassy`). Felipe's bar stays Clear.
+- **Saved layouts** (Layout page). Save current keeps bar.layout, bar.background and the raw
+  groups and style; Apply records a full Undo (layout, background, groups, style) first. Apply
+  never hides or shows widgets: when the widget set or a widget's inline settings differ, it
+  refuses and names the widget (Presets.widgetDiff, tested). Max 10. Not yet live tested: needs
+  the round trip below with Felipe clicking.
+
+Open: live round trip for saved layouts (save A, change things B, apply equals A, Undo equals
+B, pill move plus Undo regression); Groups click and key pass (check the cursor ring after
+Ctrl+Down); docs/plan.md rows for these features.

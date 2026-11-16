@@ -123,7 +123,7 @@ Column {
       anchors.verticalCenter: parent.verticalCenter
       textFormat: Text.PlainText
       wrapMode: Text.WordWrap
-      text: "Save the bar as it is now, then experiment. Apply brings it all back: widgets, pills and their look."
+      text: "Save the bar as it is now, then experiment. Apply puts back the order of widgets, the pills and their look. It does not hide or show widgets."
       color: page.dim
       font.family: page.fontFamily
       font.pixelSize: Style.font.caption

@@ -481,6 +481,22 @@ var tests = [
   }]
 ]
 
+
+// Saved layouts: a save days old may list other widgets than the bar has now.
+;(function () {
+  var saved = shaped({ left: ["a", "b"], right: [{ id: "w", settings: { unit: "C" } }] })
+  var hidden = shaped({ left: ["a"], right: [{ id: "w", settings: { unit: "C" } }] })
+  var added = shaped({ left: ["a", "b", "n"], right: [{ id: "w", settings: { unit: "C" } }] })
+  var retuned = shaped({ left: ["a", "b"], right: [{ id: "w", settings: { unit: "F" } }] })
+  assert.ok(P.undoPlan(hidden, saved).error, "planTo refuses when a saved widget is gone")
+  assert.deepStrictEqual(P.widgetDiff(hidden, saved), { missing: ["b"], extra: [], changed: [] })
+  assert.ok(P.undoPlan(added, saved).error, "planTo refuses when the bar has a new widget")
+  assert.deepStrictEqual(P.widgetDiff(added, saved), { missing: [], extra: ["n"], changed: [] })
+  assert.deepStrictEqual(P.widgetDiff(retuned, saved), { missing: [], extra: [], changed: ["w"] })
+  assert.deepStrictEqual(P.widgetDiff(saved, saved), { missing: [], extra: [], changed: [] })
+  console.log("ok   widgetDiff names what blocks a saved layout")
+})()
+
 var failed = 0
 tests.forEach(function (t) {
   try { t[1](); console.log("ok   " + t[0]) } catch (e) { failed++; console.log("FAIL " + t[0] + "\n     " + e.message) }

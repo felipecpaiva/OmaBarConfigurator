@@ -823,6 +823,16 @@ Item {
     persistPatch({ saved: root.savedLayouts.filter(function(e) { return e.id !== String(id) }) })
   }
 
+  // Apply moves widgets only; it never hides or shows one. So it names what differs.
+  function savedBlockedText(e) {
+    var d = Presets.widgetDiff(root.liveLayout, e.layout)
+    var names = function(list) { return list.map(function(id) { return root.widgetName(id) }).join(", ") }
+    if (d.missing.length) return e.name + " has " + names(d.missing) + ", which the bar does not show now. Show it in Widgets, then Apply again."
+    if (d.extra.length) return "The bar now shows " + names(d.extra) + ", which " + e.name + " did not have. Hide it in Widgets, then Apply again."
+    if (d.changed.length) return "The settings of " + names(d.changed) + " changed since " + e.name + " was saved, so it cannot be applied. Save a new layout instead."
+    return "This saved layout cannot be applied to the bar as it is now."
+  }
+
   // Bar layout, background, groups and style back to the saved entry. Undo first
   // records all four, so Undo puts the bar back as it was before the apply.
   function applySavedLayout(id) {
@@ -832,7 +842,7 @@ Item {
     if (!e) return
     refreshLive()
     var p = plan(function() { return Presets.undoPlan(root.liveLayout, e.layout) })
-    if (p.error) { root.layoutError = String(p.error); return }
+    if (p.error) { root.layoutError = root.savedBlockedText(e); return }
     var argv = p.argv.slice()
     if (e.background !== "" && e.background !== root.barBackground) argv.push(["omarchy-bar", "background", e.background])
     var groups = root.rawStoreSection("groups"), style = root.rawStoreSection("style")
@@ -841,7 +851,7 @@ Item {
       return
     }
     persistPatch({ undo: { layout: Presets.snapshot(root.liveLayout), breaks: root.storeData.groups.breaks,
-                           label: e.name, at: new Date().toISOString(), running: argv.length > 0,
+                           label: "Applied " + e.name, at: new Date().toISOString(), running: argv.length > 0,
                            groups: groups, style: style, background: root.barBackground } })
     runLayout(argv, e.layout, function(text) {
       return PillStyle.writeStore(text, { groups: e.groups, style: e.style })

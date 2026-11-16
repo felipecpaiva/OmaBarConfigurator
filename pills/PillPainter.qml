@@ -22,6 +22,7 @@ BarWidget {
   property string storeText: ""
   // shell.json, read only to know whether the bar is Solid (the plugin bar API has no glassy flag).
   property string shellText: ""
+  readonly property bool solid: PillStyle.solidBar(root.shellText)
   readonly property var store: PillStyle.readStore(storeText)
   readonly property var style: store.style
   readonly property bool active: style.enabled && bar !== null
@@ -47,7 +48,7 @@ BarWidget {
     cornerRadius: style.radiusFollowsWindows ? Style.cornerRadius : style.radius,
     // The default fill on a Solid bar is the bar's own color, so the pill would vanish:
     // tint the current theme's bar color 10% toward its text color. A color the user picked is kept as is.
-    fillColor: style.color === "background" && PillStyle.solidBar(root.shellText)
+    fillColor: style.color === "background" && root.solid
       ? Qt.tint(root.bar && root.bar.background ? root.bar.background : Commons.Color.background, Qt.rgba(Commons.Color.foreground.r, Commons.Color.foreground.g, Commons.Color.foreground.b, 0.10))
       : PillStyle.resolveColor(style.color, themeColors, themeColors.background),
     fillOpacity: style.fillOpacity,
@@ -79,14 +80,17 @@ BarWidget {
       solo: store.groups.solo, noPill: store.groups.noPill, centerParts: store.groups.centerParts
     })[area]
     // Square edges: the outermost pill runs to the screen edge, in the parent's coordinates.
-    if (style.squareEdges && parent && pills.length && area !== "center") {
+    var slots = areas[area]
+    var outer = area === "left" ? pills.length && slots.length && pills[0].ids[0] === slots[0].id
+      : pills.length && slots.length && pills[pills.length - 1].ids.indexOf(slots[slots.length - 1].id) >= 0
+    if (style.squareEdges && parent && outer && area !== "center") {
       var top = parent
       while (top.parent) top = top.parent
       var before = BarAdapter.offsetIn(parent, null, vertical)
       // One border width past the edge, so the outline does not draw a line along the screen edge.
       var over = style.borderWidth
-      if (area === "left") pills[0].start = -before - over
-      else pills[pills.length - 1].end = (vertical ? top.height : top.width) - before + over
+      if (area === "left") { pills[0].start = -before - over; pills[0].edge = true }
+      else { pills[pills.length - 1].end = (vertical ? top.height : top.width) - before + over; pills[pills.length - 1].edge = true }
     }
     return pills
   }
@@ -130,11 +134,11 @@ BarWidget {
       delete byKey[pills[m].ids[0]]
     }
     if (ordered.length === have.length) for (var o = 0; o < have.length; o++) have[o] = ordered[o]
-    var square = style.squareEdges
     for (var j = 0; j < have.length; j++) {
       // Only the outermost pills touch a screen edge: left's first, right's last.
-      have[j].squareStart = square && area === "left" && j === 0
-      have[j].squareEnd = square && area === "right" && j === have.length - 1
+      // Only a pill stretched to the edge in pillsOf gets square corners.
+      have[j].squareStart = area === "left" && pills[j].edge === true
+      have[j].squareEnd = area === "right" && pills[j].edge === true
       have[j].key = pills[j].ids[0]
       have[j].aim(pills[j].start, pills[j].end)
     }
