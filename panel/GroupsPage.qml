@@ -15,9 +15,13 @@ Column {
   property var panel: null
 
   readonly property var breaks: panel && panel.storeData && panel.storeData.groups ? panel.storeData.groups.breaks : null
+  readonly property var rules: {
+    var g = panel && panel.storeData ? panel.storeData.groups : null
+    return { solo: g ? g.solo : [], noPill: g ? g.noPill : [], centerParts: !!(g && g.centerParts) }
+  }
   readonly property bool pillsOn: !!(panel && panel.storeData && panel.storeData.style && panel.storeData.style.enabled)
   readonly property string selfId: Model.SELF_ID
-  readonly property var areaRows: Groups.rows(panel ? panel.liveLayout : null, breaks, page.selfId)
+  readonly property var areaRows: Groups.rows(panel ? panel.liveLayout : null, breaks, page.selfId, rules)
   readonly property var areas: [
     { key: "left", title: "LEFT" },
     { key: "center", title: "CENTER" },
@@ -56,6 +60,54 @@ Column {
     textFormat: Text.PlainText
     wrapMode: Text.WordWrap
     text: "A widget that is hidden on the bar cannot start a pill."
+    color: page.dim
+    font.family: page.fontFamily
+    font.pixelSize: Style.font.caption
+  }
+
+  Text {
+    width: parent.width
+    textFormat: Text.PlainText
+    wrapMode: Text.WordWrap
+    text: "Own gives a widget a pill of its own, for example the workspaces. None draws no pill behind it, for widgets that paint their own background."
+    color: page.dim
+    font.family: page.fontFamily
+    font.pixelSize: Style.font.caption
+  }
+
+  Item {
+    width: parent.width
+    height: Math.max(centerLabel.implicitHeight, centerSwitch.implicitHeight)
+    Text {
+      id: centerLabel
+      anchors.left: parent.left
+      anchors.right: centerSwitch.left
+      anchors.rightMargin: Style.space(8)
+      anchors.verticalCenter: parent.verticalCenter
+      textFormat: Text.PlainText
+      wrapMode: Text.WordWrap
+      text: "Split the center into three pills"
+      color: page.foreground
+      font.family: page.fontFamily
+      font.pixelSize: Style.font.body
+    }
+    ToggleSwitch {
+      id: centerSwitch
+      anchors.right: parent.right
+      anchors.verticalCenter: parent.verticalCenter
+      enabled: !!page.panel && !page.panel.busy
+      opacity: enabled ? 1 : 0.4
+      checked: page.rules.centerParts
+      foreground: page.foreground
+      onToggled: page.panel.setCenterParts(!page.rules.centerParts)
+    }
+  }
+
+  Text {
+    width: parent.width
+    textFormat: Text.PlainText
+    wrapMode: Text.WordWrap
+    text: "The widgets before the clock, the clock group, and the widgets after the clock each get their own pill. Off by default."
     color: page.dim
     font.family: page.fontFamily
     font.pixelSize: Style.font.caption
@@ -109,88 +161,14 @@ Column {
             fontFamily: page.fontFamily
           }
 
-          Rectangle {
-            id: band
-            readonly property var modelData: entry.modelData
-            width: section.width
-            height: Style.space(32)
-            radius: Style.space(6)
-            color: modelData.pill % 2 === 0 ? page.panel.selectedFill : "transparent"
-
-            Rectangle {
-              id: chip
-              anchors.left: parent.left
-              anchors.leftMargin: Style.space(8)
-              anchors.verticalCenter: parent.verticalCenter
-              width: Style.space(20)
-              height: width
-              radius: width / 2
-              color: "transparent"
-              border.width: 1
-              border.color: page.dim
-              Text {
-                anchors.centerIn: parent
-                textFormat: Text.PlainText
-                text: String(band.modelData.pill)
-                color: page.foreground
-                font.family: page.fontFamily
-                font.pixelSize: Style.font.caption
-              }
-            }
-
-            Text {
-              id: glyph
-              anchors.left: chip.right
-              anchors.leftMargin: Style.space(10)
-              anchors.verticalCenter: parent.verticalCenter
-              width: Style.space(20)
-              horizontalAlignment: Text.AlignHCenter
-              textFormat: Text.PlainText
-              text: page.panel.widgetGlyph(band.modelData.id)
-              color: page.foreground
-              font.family: page.panel.widgetGlyphFamily(band.modelData.id)
-              font.pixelSize: Style.font.title
-            }
-
-            Text {
-              anchors.left: glyph.right
-              anchors.leftMargin: Style.space(8)
-              anchors.right: band.modelData.first ? parent.right : label.left
-              anchors.rightMargin: Style.space(8)
-              anchors.verticalCenter: parent.verticalCenter
-              textFormat: Text.PlainText
-              elide: Text.ElideRight
-              text: page.panel.widgetName(band.modelData.id)
-              color: page.foreground
-              font.family: page.fontFamily
-              font.pixelSize: Style.font.body
-            }
-
-            Text {
-              id: label
-              visible: !band.modelData.first
-              anchors.right: startSwitch.left
-              anchors.rightMargin: Style.space(8)
-              anchors.verticalCenter: parent.verticalCenter
-              textFormat: Text.PlainText
-              text: band.modelData.repeat ? "Same widget appears earlier; split there" : "New pill starts here"
-              color: page.dim
-              font.family: page.fontFamily
-              font.pixelSize: Style.font.caption
-            }
-
-            ToggleSwitch {
-              id: startSwitch
-              visible: !band.modelData.first
-              anchors.right: parent.right
-              anchors.rightMargin: Style.space(8)
-              anchors.verticalCenter: parent.verticalCenter
-              enabled: !band.modelData.repeat && !page.panel.busy
-              opacity: enabled ? 1 : 0.4
-              checked: band.modelData.startsPill
-              foreground: page.foreground
-              onToggled: page.panel.toggleBreak(section.modelData.key, band.modelData.id)
-            }
+          GroupRow {
+            width: parent.width
+            panel: page.panel
+            area: section.modelData.key
+            row: entry.modelData
+            foreground: page.foreground
+            dim: page.dim
+            fontFamily: page.fontFamily
           }
         }
       }

@@ -112,6 +112,73 @@ var tests = [
   }]
 ]
 
+function groupsOf(r) { return r.map(function (p) { return p.ids.join("") }) }
+function withOpts(extra) { return Object.assign({ padding: 0, gap: 0 }, extra) }
+function P(id, part, start) { return { id: id, part: part, start: start, end: start + 10 } }
+
+tests.push(
+  ["solo in the middle", function () {
+    assert.deepStrictEqual(groupsOf(run(row, [], withOpts({ solo: ["b"] }))), ["a", "b", "cd"])
+    assert.deepStrictEqual(run(row, [], withOpts({ solo: ["b"] }))[1], { start: 10, end: 20, ids: ["b"] })
+  }],
+  ["solo at the ends and everywhere", function () {
+    assert.deepStrictEqual(groupsOf(run(row, [], withOpts({ solo: ["a"] }))), ["a", "bcd"])
+    assert.deepStrictEqual(groupsOf(run(row, [], withOpts({ solo: ["d"] }))), ["abc", "d"])
+    assert.deepStrictEqual(groupsOf(run(row, [], withOpts({ solo: ["a", "b", "c", "d"] }))), ["a", "b", "c", "d"])
+  }],
+  ["solo gets the gap and the bounds like any split", function () {
+    var r = run(row, [], { padding: 4, gap: 6, min: 2, solo: ["b"] })
+    assert.deepStrictEqual(r.map(function (p) { return [p.start, p.end] }), [[2, 7], [13, 17], [23, 44]])
+  }],
+  ["noPill splits and draws nothing", function () {
+    assert.deepStrictEqual(groupsOf(run(row, [], withOpts({ noPill: ["b"] }))), ["a", "cd"])
+    assert.deepStrictEqual(groupsOf(run(row, [], withOpts({ noPill: ["b", "c"] }))), ["a", "d"])
+  }],
+  ["noPill at the edges and alone", function () {
+    assert.deepStrictEqual(groupsOf(run(row, [], withOpts({ noPill: ["a"] }))), ["bcd"])
+    assert.deepStrictEqual(groupsOf(run(row, [], withOpts({ noPill: ["d"] }))), ["abc"])
+    assert.deepStrictEqual(run(row, [], withOpts({ noPill: ["a", "b", "c", "d"] })), [])
+  }],
+  ["noPill wins over solo", function () {
+    assert.deepStrictEqual(groupsOf(run(row, [], withOpts({ noPill: ["b"], solo: ["b"] }))), ["a", "cd"])
+  }],
+  ["noPill keeps the gap rule between its neighbours", function () {
+    var r = run(row, [], { padding: 12, gap: 8, noPill: ["b"] })
+    assert.deepStrictEqual([r[0].end, r[1].start], [11, 19]) // mid 15, centred gap
+  }],
+  ["centerParts splits the center area into three", function () {
+    var c = [P("a", "centerBegin", 0), P("b", "center", 10), P("c", "center", 20), P("d", "centerEnd", 30)]
+    assert.deepStrictEqual(groupsOf(run(c, [], withOpts({ centerParts: true }), "center")), ["a", "bc", "d"])
+    assert.deepStrictEqual(groupsOf(run(c, [], withOpts({}), "center")), ["abcd"])
+    assert.deepStrictEqual(groupsOf(run(c, [], withOpts({ centerParts: false }), "center")), ["abcd"])
+  }],
+  ["centerParts with each part empty", function () {
+    var go = function (c) { return groupsOf(run(c, [], withOpts({ centerParts: true }), "center")) }
+    assert.deepStrictEqual(go([P("b", "center", 10), P("d", "centerEnd", 30)]), ["b", "d"])
+    assert.deepStrictEqual(go([P("a", "centerBegin", 0), P("d", "centerEnd", 30)]), ["a", "d"])
+    assert.deepStrictEqual(go([P("a", "centerBegin", 0), P("b", "center", 10)]), ["a", "b"])
+    assert.deepStrictEqual(go([P("b", "center", 10), P("c", "center", 20)]), ["bc"])
+    assert.deepStrictEqual(go([P("d", "centerEnd", 30)]), ["d"])
+    assert.deepStrictEqual(go([]), [])
+  }],
+  ["centerParts only touches the center area", function () {
+    var l = [P("a", "centerBegin", 0), P("b", "center", 10), P("d", "centerEnd", 30)]
+    assert.deepStrictEqual(groupsOf(run(l, [], withOpts({ centerParts: true }), "left")), ["abd"])
+  }],
+  ["rules combine with breaks and repeated ids", function () {
+    var c = [P("a", "centerBegin", 0), P("b", "center", 10), P("x", "center", 20), P("c", "center", 30), P("x", "centerEnd", 40), P("e", "centerEnd", 50)]
+    var r = run(c, ["x"], withOpts({ centerParts: true, solo: ["c"], noPill: ["e"] }), "center")
+    assert.deepStrictEqual(groupsOf(r), ["a", "b", "x", "c", "x"])
+    r = run(c, [], withOpts({ solo: ["x"] }), "center")
+    assert.deepStrictEqual(groupsOf(r), ["ab", "x", "c", "x", "e"])
+  }],
+  ["bad rule values never throw", function () {
+    [null, 3, "s", {}, { length: "x" }, [1, null]].forEach(function (v) {
+      assert.deepStrictEqual(groupsOf(run(row, [], withOpts({ solo: v, noPill: v, centerParts: v }))), ["abcd"])
+    })
+  }]
+)
+
 var failed = 0
 tests.forEach(function (pair) {
   try { pair[1]() } catch (e) {

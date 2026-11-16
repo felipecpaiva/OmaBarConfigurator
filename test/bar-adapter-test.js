@@ -96,9 +96,9 @@ assert.deepStrictEqual(A.areaSlots(loc, "left", false), [
 ])
 // Center: one coordinate space through sections (400) and the box (50).
 assert.deepStrictEqual(A.areaSlots(loc, "center", false), [
-  { id: "omarchy.media", start: 400, end: 450 },
-  { id: "omarchy.weather", start: 510, end: 550 },
-  { id: "omarchy.clock", start: 450, end: 510 }
+  { id: "omarchy.media", start: 400, end: 450, part: "centerBegin" },
+  { id: "omarchy.weather", start: 510, end: 550, part: "centerEnd" },
+  { id: "omarchy.clock", start: 450, end: 510, part: "center" }
 ])
 assert.deepStrictEqual(A.areaSlots(loc, "right", false).map(function (s) { return [s.start, s.end] }), [[900, 940], [940, 970]])
 assert.deepStrictEqual(A.areaSlots(null, "left", false), [])

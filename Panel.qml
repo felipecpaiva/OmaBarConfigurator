@@ -504,6 +504,19 @@ Item {
     writeBreaks(area, result[String(area)])
   }
 
+  // Own / None / Shared for one widget (the solo and noPill lists), and the three-pill center.
+  function setWidgetPillMode(id, mode) {
+    if (!root.storeLoaded || root.busy) return
+    var g = Groups.setMode(root.storeData.groups, String(id), String(mode))
+    var copy = function(list) { var out = []; for (var i = 0; i < (list || []).length; i++) out.push(String(list[i])); return out }
+    commitText(PillStyle.patchStore(root.lastRawText, "groups", { solo: copy(g.solo), noPill: copy(g.noPill) }))
+  }
+
+  function setCenterParts(on) {
+    if (!root.storeLoaded || root.busy) return
+    commitText(PillStyle.patchStore(root.lastRawText, "groups", { centerParts: on === true }))
+  }
+
   // ---- layout API (presets, move pill, undo; logic lives in lib/Presets.js) --
   readonly property bool canUndo: root.storeData.undo !== null
   readonly property string undoLabel: root.canUndo ? root.storeData.undo.label : ""

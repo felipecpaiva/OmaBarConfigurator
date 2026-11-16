@@ -127,7 +127,7 @@ function offsetIn(item, ancestor, vertical) {
 }
 
 // Slots of one area as fresh JS arrays, all in the coordinate space of the
-// area's pill parent: [{ id, start, end }]. Input for GroupLayout.pills.
+// area's pill parent: [{ id, start, end }] (center slots also carry part). Input for GroupLayout.pills.
 function areaSlots(located, area, vertical) {
   var out = []
   if (!located) return out
@@ -138,7 +138,9 @@ function areaSlots(located, area, vertical) {
     var slots = slotsOf(lists[i], vertical)
     for (var j = 0; j < slots.length; j++) {
       var start = offsetIn(slots[j], parent, vertical)
-      out.push({ id: slotId(slots[j]), start: start, end: start + (vertical ? slots[j].height : slots[j].width) })
+      var slot = { id: slotId(slots[j]), start: start, end: start + (vertical ? slots[j].height : slots[j].width) }
+      if (area === "center") slot.part = String(lists[i].region) // centerBegin | center | centerEnd, for the centerParts rule
+      out.push(slot)
     }
   }
   return out

@@ -52,7 +52,7 @@ test("readStore: empty text", function() {
   assert.strictEqual(r.version, 2)
   assert.deepStrictEqual(r.hidden, [])
   assert.deepStrictEqual(r.style, P.DEFAULTS)
-  assert.deepStrictEqual(r.groups, { breaks: { left: [], center: [], right: [] } })
+  assert.deepStrictEqual(r.groups, { breaks: { left: [], center: [], right: [] }, solo: [], noPill: [], centerParts: false })
   assert.deepStrictEqual(r.warnings, [])
 })
 test("readStore: v1 migration keeps hidden", function() {
@@ -156,6 +156,22 @@ test("patchStore round trip with hidden", function() {
   assert.deepStrictEqual(r.hidden, [{ id: "h" }])
   assert.strictEqual(r.style.enabled, true)
   assert.strictEqual(r.style.gap, 8)
+})
+
+test("group rules are validated on read", function() {
+  var r = P.readStore(JSON.stringify({ groups: { solo: ["a", "a", 3, "", "b"], noPill: "x", centerParts: "yes" } }))
+  assert.deepStrictEqual([r.groups.solo, r.groups.noPill, r.groups.centerParts], [["a", "b"], [], false])
+  r = P.readStore(JSON.stringify({ groups: { noPill: ["n"], centerParts: true } }))
+  assert.deepStrictEqual([r.groups.noPill, r.groups.centerParts], [["n"], true])
+  assert.deepStrictEqual(P.GROUP_DEFAULTS, { solo: [], noPill: [], centerParts: false })
+})
+
+test("patchStore groups keeps other keys and validates the rules", function() {
+  var prev = JSON.stringify({ groups: { breaks: { left: ["a"] }, solo: ["s"], mode: "x" } })
+  var o = JSON.parse(P.patchStore(prev, "groups", { noPill: ["n", "n", 4], centerParts: true }))
+  assert.deepStrictEqual(o.groups, { breaks: { left: ["a"] }, solo: ["s"], mode: "x", noPill: ["n"], centerParts: true })
+  o = JSON.parse(P.patchStore(JSON.stringify(o), "groups", { solo: [], centerParts: "no", noPill: "bad" }))
+  assert.deepStrictEqual([o.groups.solo, o.groups.noPill, o.groups.centerParts], [[], ["n"], true])
 })
 
 var failed = 0

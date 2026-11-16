@@ -100,6 +100,87 @@ var tests = [
   }]
 ]
 
+// Seeded PRNG (mulberry32) so a failure replays.
+function rng(seed) {
+  return function () {
+    seed |= 0; seed = seed + 0x6D2B79F5 | 0
+    var t = Math.imul(seed ^ seed >>> 15, 1 | seed)
+    t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t
+    return ((t ^ t >>> 14) >>> 0) / 4294967296
+  }
+}
+
+tests.push(
+  ["modes and pill numbers", function () {
+    var r = Groups.rows(lay, {}, SELF, { solo: ["b"], noPill: ["d"] })
+    assert.deepStrictEqual(r.left.map(function (x) { return x.mode }), ["shared", "solo", "shared", "none"])
+    assert.deepStrictEqual(pills(r.left), [1, 2, 3, 0])
+    assert.deepStrictEqual(r.left.map(function (x) { return x.startsPill }), [true, true, true, false])
+    assert.strictEqual(Groups.pillCount(r).left, 3)
+  }],
+  ["no rules means every row is shared", function () {
+    Groups.rows(lay, {}, SELF).left.forEach(function (x) { assert.strictEqual(x.mode, "shared") })
+    Groups.rows(lay, {}, SELF, null)
+  }],
+  ["noPill closes the open pill, centerParts splits center", function () {
+    var r = Groups.rows({ left: ["a", "n", "b"] }, {}, SELF, { noPill: ["n"] })
+    assert.deepStrictEqual(pills(r.left), [1, 0, 2])
+    r = Groups.rows({ centerBegin: ["a"], center: ["b"], centerEnd: ["c"] }, {}, SELF, { centerParts: true })
+    assert.deepStrictEqual(pills(r.center), [1, 2, 3])
+  }],
+  ["setMode moves ids between lists and keeps other keys", function () {
+    var g = { breaks: { left: [] }, solo: ["a"], noPill: ["b"], centerParts: true }
+    var copy = JSON.stringify(g)
+    var s = Groups.setMode(g, "b", "solo")
+    assert.deepStrictEqual([s.solo, s.noPill], [["a", "b"], []])
+    assert.deepStrictEqual([s.breaks, s.centerParts], [g.breaks, true])
+    assert.deepStrictEqual(Groups.setMode(s, "a", "none").noPill, ["a"])
+    assert.deepStrictEqual(Groups.setMode(s, "a", "none").solo, ["b"])
+    var sh = Groups.setMode(s, "a", "shared")
+    assert.deepStrictEqual([sh.solo, sh.noPill], [["b"], []])
+    assert.strictEqual(JSON.stringify(g), copy)
+    assert.deepStrictEqual(Groups.setMode(null, "a", "solo"), { solo: ["a"], noPill: [] })
+    assert.deepStrictEqual(Groups.setMode({}, 5, "solo"), { solo: [], noPill: [] })
+  }],
+  ["random layouts and rules agree with GroupLayout", function () {
+    var rand = rng(20261116)
+    var pick = function (a) { return a[Math.floor(rand() * a.length)] }
+    var pool = ["a", "b", "c", "d", "e", "f"]
+    var subset = function () { return pool.filter(function () { return rand() < 0.3 }) }
+    for (var n = 0; n < 400; n++) {
+      var layout = {}
+      ;["left", "centerBegin", "center", "centerEnd", "right"].forEach(function (key) {
+        layout[key] = []
+        for (var i = rand() * 5 | 0; i > 0; i--) layout[key].push(pick(pool.concat([SELF])))
+      })
+      var breaks = { left: subset(), center: subset(), right: subset() }
+      var rules = { solo: subset(), noPill: subset(), centerParts: rand() < 0.5 }
+      var r = Groups.rows(layout, breaks, SELF, rules)
+      var slots = {}
+      var want = {}
+      Object.keys(r).forEach(function (area) {
+        var parts = area === "center" ? ["centerBegin", "center", "centerEnd"] : [area]
+        var at = 0
+        slots[area] = []
+        parts.forEach(function (key) {
+          layout[key].forEach(function (id) {
+            if (id === SELF) return
+            slots[area].push({ id: id, part: key, start: at * 10, end: at * 10 + 10 }); at++
+          })
+        })
+        want[area] = []
+        r[area].forEach(function (w) { if (w.pill > 0) (want[area][w.pill - 1] = want[area][w.pill - 1] || []).push(w.id) })
+      })
+      var got = GL.pills(slots, breaks, { padding: 0, gap: 0, solo: rules.solo, noPill: rules.noPill, centerParts: rules.centerParts })
+      Object.keys(r).forEach(function (area) {
+        var msg = JSON.stringify({ layout: layout, breaks: breaks, rules: rules, area: area })
+        assert.deepStrictEqual(got[area].map(function (p) { return p.ids }), want[area], msg)
+        r[area].forEach(function (w) { assert.strictEqual(w.pill === 0, w.mode === "none", msg) })
+      })
+    }
+  }]
+)
+
 var failed = 0
 tests.forEach(function (pair) {
   try { pair[1]() } catch (e) {
