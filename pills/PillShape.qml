@@ -43,12 +43,27 @@ Rectangle {
   property real aimEnd: NaN
   property string key: ""
 
+  // Targets that arrive in a stream (a widget animating its own width) are followed frame
+  // by frame: restarting the glide on every frame left the pill chasing the widget for half
+  // a second. Only a change after a quiet moment glides.
+  property real lastAimAt: 0
+  property bool following: false
+  readonly property int quietMs: 200
+
   // Sub-pixel changes draw the same pill, so they must not start the glide.
   function aim(s, e) {
     s = Math.round(s)
     e = Math.round(e)
-    if (s !== aimStart) { aimStart = s; start = s }
-    if (e !== aimEnd) { aimEnd = e; end = e }
+    if (s === aimStart && e === aimEnd) return
+    var now = Date.now()
+    following = now - lastAimAt < quietMs
+    lastAimAt = now
+    aimStart = s
+    aimEnd = e
+    // A stopped glide would leave an edge between its old and new place: set both edges.
+    if (following) { startGlide.stop(); endGlide.stop(); start = s; end = e; return }
+    if (start !== s) start = s
+    if (end !== e) end = e
   }
 
   readonly property real along: Math.max(0, Math.round(end) - Math.round(start))
@@ -74,12 +89,12 @@ Rectangle {
   // 160 ms strong ease out: most of the distance in the first frames, so the
   // trail behind the widgets is short (docs/research/impasto-animations.md).
   Behavior on start {
-    enabled: pill.animate && pill.placed
-    NumberAnimation { duration: Style.duration(160); easing.type: Easing.BezierSpline; easing.bezierCurve: Style.easeOut }
+    enabled: pill.animate && pill.placed && !pill.following
+    NumberAnimation { id: startGlide; duration: Style.duration(160); easing.type: Easing.BezierSpline; easing.bezierCurve: Style.easeOut }
   }
   Behavior on end {
-    enabled: pill.animate && pill.placed
-    NumberAnimation { duration: Style.duration(160); easing.type: Easing.BezierSpline; easing.bezierCurve: Style.easeOut }
+    enabled: pill.animate && pill.placed && !pill.following
+    NumberAnimation { id: endGlide; duration: Style.duration(160); easing.type: Easing.BezierSpline; easing.bezierCurve: Style.easeOut }
   }
   // Theme switches fade like the stock bar background.
   Behavior on color {
