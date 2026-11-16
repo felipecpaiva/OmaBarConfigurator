@@ -20,6 +20,8 @@ BarWidget {
   implicitHeight: 0
 
   property string storeText: ""
+  // shell.json, read only to know whether the bar is Solid (the plugin bar API has no glassy flag).
+  property string shellText: ""
   readonly property var store: PillStyle.readStore(storeText)
   readonly property var style: store.style
   readonly property bool active: style.enabled && bar !== null
@@ -45,7 +47,7 @@ BarWidget {
     cornerRadius: style.radiusFollowsWindows ? Style.cornerRadius : style.radius,
     // The default fill on a Solid bar is the bar's own color, so the pill would vanish:
     // tint it 10% toward the text color. A color the user picked is kept as is.
-    fillColor: style.color === "background" && BarAdapter.solidBar(root.bar)
+    fillColor: style.color === "background" && PillStyle.solidBar(root.shellText)
       ? Qt.tint(Commons.Color.background, Qt.rgba(Commons.Color.foreground.r, Commons.Color.foreground.g, Commons.Color.foreground.b, 0.10))
       : PillStyle.resolveColor(style.color, themeColors, themeColors.background),
     fillOpacity: style.fillOpacity,
@@ -165,6 +167,15 @@ BarWidget {
     onFileChanged: reload()
     onLoaded: root.storeText = text()
     onLoadFailed: root.storeText = ""
+  }
+
+  FileView {
+    path: Quickshell.env("HOME") + "/.config/omarchy/shell.json"
+    watchChanges: true
+    printErrors: false
+    onFileChanged: reload()
+    onLoaded: root.shellText = text()
+    onLoadFailed: root.shellText = ""
   }
 
   // The file changes often: each distinct store warning is logged once per painter.

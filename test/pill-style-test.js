@@ -4,6 +4,16 @@ var P = require("../lib/PillStyle.js")
 var tests = []
 function test(name, fn) { tests.push([name, fn]) }
 
+test("solidBar reads bar.background, old configs and bad text", function() {
+  assert.strictEqual(P.solidBar('{"bar":{"background":"opaque"}}'), true)
+  assert.strictEqual(P.solidBar('{"bar":{"background":"glassy"}}'), false)
+  assert.strictEqual(P.solidBar('{"bar":{"background":"none"}}'), false)
+  assert.strictEqual(P.solidBar('{"bar":{}}'), true)
+  assert.strictEqual(P.solidBar('{"bar":{"transparent":true}}'), false)
+  assert.strictEqual(P.solidBar("not json"), false)
+  assert.strictEqual(P.solidBar(""), false)
+})
+
 test("defaults for empty input", function() {
   var n = P.normalize(undefined)
   assert.deepStrictEqual(n.style, P.DEFAULTS)
