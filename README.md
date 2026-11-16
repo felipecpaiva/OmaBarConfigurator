@@ -83,6 +83,10 @@ is the empty space inside the two widgets, so those ends can look tight. OmaBar 
 rather than its box, which helps, and one Omarchy **spacer** widget (`omarchy bar put omarchy.spacer`) adds real room
 at one spot. Omarchy's commands allow one spacer per bar; OmaBar treats it as space between pills.
 
+**Tip for the Spaces widget:** if you use Spaces inside a pill, set its own *Pill shape* to *oval*
+(`omarchy bar set tornikegomareli.spaces pillShape oval`), so the box behind the active workspace has round ends that
+match the pill. With *auto*, it follows your window corners and can be square.
+
 <p align="center"><img src="branding/demo/spacer.gif" alt="A tight join between two pills, then one Omarchy spacer adding room between them" width="720"></p>
 
 ## Install
