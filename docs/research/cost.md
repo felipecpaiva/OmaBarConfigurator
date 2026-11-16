@@ -92,3 +92,24 @@ On minus off: CPU median -0.07 points, mean -0.05 points; RSS -0.1 MiB (last) an
 shell costs no more than with them off, within noise. Not measured: cost while the pointer moves
 over the bar (needs input, not injected); inkSpan re-runs when any item in a widget changes, so a
 hover animation re-runs it per frame for that area.
+
+## Motion cost: workspace switch on battery (2026-11-16, late)
+
+Felipe saw pills move slowly on a workspace switch on battery (power-saver). Method: 60 fps
+gpu-screen-recorder of the bar while `hl.dsp.focus` switches workspaces 1 and 2 three times; per
+switch, the span of frames where the bar changes and the share of frames that change (fps).
+Recompute counts from a temporary counter in the installed copy only.
+
+| Build | Frame rate during a switch | Switch span | Area recomputes |
+|-------|---------------------------:|------------:|----------------:|
+| Pills off | 60 fps | 350 to 417 ms | none |
+| v0.2.0 | 38 to 43 fps | 567 to 650 ms | about 1,600 per second |
+| + follow streams, ink cache (609ed0d) | 56 to 60 fps | 500 to 567 ms | not counted |
+| + one recompute per frame (064aff6) | 55 to 60 fps | 367 to 417 ms | about 62 per second |
+
+Causes, in order: (1) every slot that shifted re-ran the whole area binding (about 65 recomputes a
+frame), (2) each recompute walked every widget's item tree for its ink, (3) each new target
+restarted the 160 ms glide, so the pill chased the widget. Now the area binding only watches
+positions and sizes and schedules one recompute with Qt.callLater; ink is measured again only for a
+slot whose size changed; targets in a stream are followed frame by frame. With pills on, a switch
+is now as fast and as smooth as with pills off.
