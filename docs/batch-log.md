@@ -37,3 +37,36 @@ Results and evidence: architecture.md section 9. Passed: reach every section, pi
 space (0 pixels differ), cleanup on disable. Not tested: second monitor, vertical bar. Found: the
 shell caches plugin QML until a full restart; an `Instantiator` leaks reparented pills. Stop rule
 not triggered: batch 2 may start.
+
+## Batch 2: painter, group layout, style store (2026-11-16)
+
+Built in three parallel streams (GroupLayout, PillStyle and store, adapter and painter), then an
+independent adversarial review. Commits 24e025c, d014654.
+
+Tests: group layout 19/19, pill style 13/13, model 37/37, bar adapter OK (fail safe once per
+private name), contract 21 names, no timers, private names only in BarAdapter.js, qualified Color,
+qmllint, scrub. shellcheck SKIP.
+
+Review fixes: unqualified `Color` (Qt 6.12 hides `qs.Commons` Color, colors would be undefined)
+now `Commons.Color` with a runner guard; uninstall repeats disable (one call removes one
+reference); outer pills clamped to the surface edge.
+
+Live check on Felipe's laptop (Omarchy 4.5.0, scale 2, top bar, theme White), Felipe ran the
+enable and restart himself:
+- No QML errors in `journalctl --user`.
+- One pill each for left, center and right; the three center lists draw one pill.
+- Pill inset measured 5 px top and bottom (10 device px at scale 2), outer ends 6 px from the
+  screen edge.
+- Center widgets at the same device pixel columns as before pills (coffee icon 1121-1144,
+  gamepad end 1480 in both). Clock centering unchanged.
+- Store watch after an atomic replace: pills turned off and on again by rewriting the store
+  (temp file plus rename); the bar followed within 2 s both ways; on-again equals the first
+  pills-on shot with 0 differing pixels.
+
+Not checked yet: theme switch recolor, second monitor, vertical bar, idle CPU and memory numbers
+(quality bar section 2), fractional scale rounding (review S5, recorded as a known limit: shapes
+round to logical pixels).
+
+Seen: `tornikegomareli.spaces` paints its own workspace tiles, taller than the pill (box inside a
+pill, architecture risk table). Open design point for Felipe: touching widgets leave no room for
+the full 12 px inner padding or the 8 px gap at a split (review S1).
