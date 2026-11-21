@@ -14,13 +14,31 @@ ICON_DEST="$HOME/.local/share/icons/hicolor/256x256/apps/omabar.png"
 
 echo "== 1/3: installing the plugin =="
 shopt -s nullglob
-rm -rf "$PLUGIN_DEST"
-mkdir -p "$PLUGIN_DEST"
-cp -f "$REPO_DIR/manifest.json" "$REPO_DIR"/*.qml "$REPO_DIR"/*.js "$PLUGIN_DEST/"
+# Build and validate the new copy beside the installed one, then swap. The old
+# copy is kept until the whole install succeeds and is put back if anything
+# fails (a re-run is how users update, so a failed run must not leave no plugin).
+mkdir -p "$(dirname "$PLUGIN_DEST")"
+STAGE="$(mktemp -d "$PLUGIN_DEST.new.XXXXXX")"
+BACKUP="$PLUGIN_DEST.old.$$"
+restore() {
+  local rc=$?
+  rm -rf "$STAGE"
+  if [[ $rc -ne 0 && -d $BACKUP ]]; then
+    rm -rf "$PLUGIN_DEST"
+    mv "$BACKUP" "$PLUGIN_DEST"
+    echo "Install failed; your previous plugin was restored." >&2
+  fi
+  exit "$rc"
+}
+trap restore EXIT
+chmod 755 "$STAGE"
+cp -f "$REPO_DIR/manifest.json" "$REPO_DIR"/*.qml "$REPO_DIR"/*.js "$STAGE/"
 for dir in lib pills panel settings; do
-  cp -r "$REPO_DIR/$dir" "$PLUGIN_DEST/"
+  cp -r "$REPO_DIR/$dir" "$STAGE/"
 done
-omarchy plugin validate "$PLUGIN_DEST"
+omarchy plugin validate "$STAGE"
+[[ ! -e $PLUGIN_DEST ]] || mv "$PLUGIN_DEST" "$BACKUP"
+mv "$STAGE" "$PLUGIN_DEST"
 
 echo
 echo "== 2/3: enabling it =="
@@ -50,3 +68,4 @@ if [[ -f $ICON_SRC ]]; then install -Dm644 "$ICON_SRC" "$ICON_DEST"; fi
 echo
 echo "Done. Super+Space -> Apps -> OmaBar."
 echo "Uninstall with: $REPO_DIR/uninstall.sh"
+rm -rf "$BACKUP"

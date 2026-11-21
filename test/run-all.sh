@@ -14,6 +14,9 @@ for t in test/*.js; do
   node "$t" || { echo "FAIL $t"; failed=1; }
 done
 
+step "install.sh failure handling"
+bash test/install-test.sh || failed=1
+
 step "no timers or polling in the painter"
 # Zero idle cost (docs/quality-bar.md, Cost): updates come only from bindings and signals.
 if hits=$(grep -rnE '\bTimer\b|setInterval' pills lib 2>/dev/null); then
